@@ -26,7 +26,7 @@ uuid = { version = "1", features = ["v4"] }
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
 futures-util = "0.3"
 russh = "0.64"
-reqwest = { version = "0.12", default-features = false, features = ["json", "native-tls"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "native-tls"] }
 sha2 = "0.10"
 base64 = "0.23"
 rand = "0.8"
