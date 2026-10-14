@@ -1,0 +1,12 @@
+name: Feature request
+description: Suggest an idea or a missing feature
+labels: [enhancement]
+body:
+  - type: textarea
+    attributes:
+      label: What would you like Querybird to do?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Why? What are you trying to get done?

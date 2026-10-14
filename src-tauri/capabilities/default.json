@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Permissions for Querybird windows. File dialogs and the clipboard are driven by the backend, so the webview gets no plugin access beyond core window/event APIs.",
+  "windows": [
+    "main",
+    "ws-*"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-close",
+    "core:window:allow-set-title"
+  ]
+}

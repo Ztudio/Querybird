@@ -1,0 +1,13 @@
+# cargo-audit configuration. Every ignore needs a reason; revisit on each release.
+[advisories]
+ignore = [
+  # rsa: Marvin timing side-channel. No fixed version exists. Pulled in by russh only for
+  # RSA SSH client keys; Querybird performs one signature per SSH login, which does not give an
+  # attacker the large number of precise timing samples the attack needs. Prefer Ed25519 keys.
+  "RUSTSEC-2023-0071",
+  # proc-macro-error: unmaintained, build-time only (via GTK bindings on Linux). Not in the app's runtime.
+  "RUSTSEC-2024-0370",
+  # glib: unsound VariantStrIter iterator impls. Linux GUI toolkit dependency of Tauri;
+  # Querybird never calls the affected API.
+  "RUSTSEC-2024-0429",
+]

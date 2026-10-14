@@ -1,0 +1,35 @@
+[package]
+name = "querybird"
+version = "0.1.0"
+description = "Querybird — a free, open-source database client"
+license = "MIT"
+edition = "2021"
+
+[lib]
+name = "querybird_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tokio-postgres = "0.7"
+postgres-native-tls = "0.5"
+native-tls = "0.2"
+mysql_async = { version = "0.37", default-features = false, features = ["minimal-rust", "native-tls-tls"] }
+uuid = { version = "1", features = ["v4"] }
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
+futures-util = "0.3"
+russh = "0.64"
+reqwest = { version = "0.12", default-features = false, features = ["json", "native-tls"] }
+sha2 = "0.10"
+base64 = "0.22"
+rand = "0.8"
+jsonwebtoken = "9"
+open = "5"
+tauri-plugin-clipboard-manager = "2"

@@ -1,0 +1,27 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    attributes:
+      label: What happened?
+      description: Steps to reproduce, what you expected, and what you saw. Screenshots help.
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Querybird version
+      placeholder: "0.1.0"
+  - type: dropdown
+    attributes:
+      label: Operating system
+      options: [macOS, Windows, Linux]
+  - type: dropdown
+    attributes:
+      label: Database
+      options: [PostgreSQL, MySQL, Both / not database-specific]
+  - type: textarea
+    attributes:
+      label: Console log / error message
+      description: Remove any passwords, hostnames or data you don't want to share.
+      render: text

@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#4338ca"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fcd34d"/>
+      <stop offset="1" stop-color="#f97316"/>
+    </linearGradient>
+    <linearGradient id="wing" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f97316"/>
+      <stop offset="1" stop-color="#c2410c"/>
+    </linearGradient>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#bg)"/>
+
+  <!-- table: header (the perch) and two data rows -->
+  <rect x="170" y="676" width="684" height="56" rx="18" fill="#ffffff"/>
+  <g fill="#ffffff" opacity="0.5">
+    <rect x="170" y="752" width="214" height="34" rx="10"/>
+    <rect x="405" y="752" width="214" height="34" rx="10"/>
+    <rect x="640" y="752" width="214" height="34" rx="10"/>
+  </g>
+  <g fill="#ffffff" opacity="0.3">
+    <rect x="170" y="804" width="214" height="34" rx="10"/>
+    <rect x="405" y="804" width="214" height="34" rx="10"/>
+    <rect x="640" y="804" width="214" height="34" rx="10"/>
+  </g>
+
+  <!-- feet -->
+  <g stroke="#7c2d12" stroke-width="18" stroke-linecap="round">
+    <line x1="470" y1="630" x2="458" y2="678"/>
+    <line x1="560" y1="630" x2="572" y2="678"/>
+  </g>
+
+  <!-- tail -->
+  <path d="M318 470 L222 404 L248 520 Z" fill="url(#wing)"/>
+  <!-- body -->
+  <ellipse cx="512" cy="480" rx="212" ry="176" fill="url(#body)"/>
+  <!-- belly -->
+  <ellipse cx="540" cy="540" rx="128" ry="96" fill="#fef3c7" opacity="0.85"/>
+  <!-- wing -->
+  <path d="M352 470 C380 392 470 380 520 420 C500 500 430 548 360 540 Z" fill="url(#wing)"/>
+  <!-- beak -->
+  <path d="M706 444 L790 476 L706 506 Z" fill="#fb923c" stroke="#9a3412" stroke-width="10" stroke-linejoin="round"/>
+  <!-- eye -->
+  <circle cx="626" cy="418" r="40" fill="#ffffff"/>
+  <circle cx="638" cy="420" r="22" fill="#1e1b4b"/>
+  <circle cx="646" cy="410" r="7" fill="#ffffff"/>
+
+  <!-- query bubble -->
+  <g>
+    <rect x="636" y="170" width="214" height="128" rx="40" fill="#ffffff"/>
+    <path d="M684 290 L664 344 L724 296 Z" fill="#ffffff"/>
+    <rect x="676" y="208" width="134" height="18" rx="9" fill="#4338ca" opacity="0.8"/>
+    <rect x="676" y="244" width="92" height="18" rx="9" fill="#38bdf8"/>
+  </g>
+</svg>

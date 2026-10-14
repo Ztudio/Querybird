@@ -1,0 +1,10 @@
+CREATE TABLE customers (id serial PRIMARY KEY, name text NOT NULL, email text UNIQUE, country varchar(2), created_at timestamptz DEFAULT now());
+COMMENT ON TABLE customers IS 'People who buy things';
+CREATE TABLE products (id serial PRIMARY KEY, sku text UNIQUE NOT NULL, title text, price numeric(10,2), stock int DEFAULT 0, active boolean DEFAULT true);
+CREATE TABLE orders (id serial PRIMARY KEY, customer_id int REFERENCES customers(id), product_id int REFERENCES products(id), qty int, total numeric(10,2), status text DEFAULT 'pending', placed_at timestamptz DEFAULT now(), note text);
+CREATE INDEX orders_customer_idx ON orders(customer_id);
+INSERT INTO customers(name,email,country) SELECT 'Customer '||g, 'c'||g||'@example.com', (ARRAY['US','IN','DE','GB','JP'])[1+g%5] FROM generate_series(1,250) g;
+INSERT INTO products(sku,title,price,stock,active) SELECT 'SKU-'||lpad(g::text,4,'0'), 'Product '||g, round((random()*200)::numeric,2), (random()*100)::int, g%7<>0 FROM generate_series(1,60) g;
+INSERT INTO orders(customer_id,product_id,qty,total,status) SELECT 1+(random()*249)::int, 1+(random()*59)::int, 1+(random()*4)::int, round((random()*500)::numeric,2), (ARRAY['pending','paid','shipped','refunded'])[1+g%4] FROM generate_series(1,1200) g;
+CREATE VIEW paid_orders AS SELECT * FROM orders WHERE status='paid';
+CREATE FUNCTION order_count() RETURNS bigint LANGUAGE sql AS 'select count(*) from orders';
