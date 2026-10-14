@@ -12,7 +12,6 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
-use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -145,7 +144,7 @@ fn now() -> u64 {
 
 fn random_b64(n: usize) -> String {
     let mut b = vec![0u8; n];
-    rand::thread_rng().fill_bytes(&mut b);
+    rand::fill(&mut b[..]);
     URL_SAFE_NO_PAD.encode(b)
 }
 
@@ -771,6 +770,28 @@ mod tests {
             b"dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
         ));
         assert_eq!(c, "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+    }
+
+    #[test]
+    fn id_token_verification_has_a_crypto_backend() {
+        // jsonwebtoken 10+ panics at runtime without a crypto provider; make sure verifying a
+        // (bogus) RS256 token reaches signature checking and returns an error instead.
+        let jwk: jsonwebtoken::jwk::Jwk = serde_json::from_value(serde_json::json!({
+            "kty": "RSA", "kid": "k", "alg": "RS256", "use": "sig",
+            "n": "sXchSjrAb3X2d5ZqYVVw0W0FqNs8P3bp1Y8cGm6E9bQ6Yx1CqJ3x3m0P0p7m3sQ3Y5q8R6uVd7lYyY4G0eH3H9pXx7q3KQ",
+            "e": "AQAB"
+        }))
+        .unwrap();
+        let key = jsonwebtoken::DecodingKey::from_jwk(&jwk).unwrap();
+        let token = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImsifQ.eyJzdWIiOiJ4In0.c2ln";
+        let v = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
+        assert!(jsonwebtoken::decode::<serde_json::Value>(token, &key, &v).is_err());
+    }
+
+    #[test]
+    fn random_values_are_unique() {
+        assert_ne!(random_b64(32), random_b64(32));
+        assert_eq!(random_b64(32).len(), 43);
     }
 
     #[test]
