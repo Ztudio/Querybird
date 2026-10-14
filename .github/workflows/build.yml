@@ -20,9 +20,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: npm ci && npm audit --audit-level=high
       - run: cargo install cargo-audit --locked && cd src-tauri && cargo audit
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # gitleaks CLI (MIT); the gitleaks GitHub Action needs a paid licence for organisation repos.
+      - name: Secret scan
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.24.2/gitleaks_8.24.2_linux_x64.tar.gz | tar -xz gitleaks
+          ./gitleaks git --no-banner --redact -v .
 
   test:
     runs-on: ubuntu-22.04
