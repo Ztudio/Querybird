@@ -1,0 +1,2 @@
+# Fake test JWT (header {"alg":"RS256","kid":"k"}) in a unit test, since replaced with a runtime-built value.
+def16b93f9f7b700300bf6cd3279a82a58643879:src-tauri/src/chatgpt.rs:generic-api-key:786

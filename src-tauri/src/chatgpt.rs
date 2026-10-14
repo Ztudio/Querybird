@@ -783,9 +783,10 @@ mod tests {
         }))
         .unwrap();
         let key = jsonwebtoken::DecodingKey::from_jwk(&jwk).unwrap();
-        let token = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImsifQ.eyJzdWIiOiJ4In0.c2ln";
+        let b64 = |s: &str| URL_SAFE_NO_PAD.encode(s);
+        let token = format!("{}.{}.{}", b64(r#"{"alg":"RS256","kid":"k"}"#), b64(r#"{"sub":"x"}"#), b64("sig"));
         let v = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
-        assert!(jsonwebtoken::decode::<serde_json::Value>(token, &key, &v).is_err());
+        assert!(jsonwebtoken::decode::<serde_json::Value>(&token, &key, &v).is_err());
     }
 
     #[test]
