@@ -29,7 +29,7 @@ russh = "0.64"
 reqwest = { version = "0.12", default-features = false, features = ["json", "native-tls"] }
 sha2 = "0.10"
 base64 = "0.22"
-rand = "0.8"
+rand = "0.10"
 jsonwebtoken = "9"
 open = "5"
 tauri-plugin-clipboard-manager = "2"
