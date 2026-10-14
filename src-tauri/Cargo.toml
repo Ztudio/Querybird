@@ -27,7 +27,7 @@ keyring = { version = "3", features = ["apple-native", "windows-native", "sync-s
 futures-util = "0.3"
 russh = "0.64"
 reqwest = { version = "0.12", default-features = false, features = ["json", "native-tls"] }
-sha2 = "0.10"
+sha2 = "0.11"
 base64 = "0.22"
 rand = "0.8"
 jsonwebtoken = "9"
