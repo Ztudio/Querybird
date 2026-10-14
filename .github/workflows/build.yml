@@ -67,7 +67,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libdbus-1-dev librsvg2-dev libayatana-appindicator3-dev
       - run: npm ci
       - run: npm run tauri build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: querybird-${{ matrix.platform }}
           path: |
