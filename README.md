@@ -11,16 +11,18 @@ Runs on macOS, Windows and Linux.
 
 ## Download
 
-Get the latest installer from the **[Releases](../../releases)** page:
+Installers for the current version are in [`downloads/`](downloads/):
 
-| Platform | File |
-| --- | --- |
-| macOS (Apple Silicon + Intel) | `Querybird_x.y.z_universal.dmg` |
-| Windows 10/11 | `Querybird_x.y.z_x64-setup.exe` (or `.msi`) |
-| Linux | `.deb` or `.AppImage` |
+| Platform | File | SHA-256 |
+| --- | --- | --- |
+| macOS (Apple Silicon + Intel) | [Querybird_0.1.0_universal.dmg](downloads/Querybird_0.1.0_universal.dmg) | `3096df30ab86a15eb7aeebfe53f0bdce553b75726d78667392d0379f4b9761a1` |
+| Windows 10/11 (x64) | [Querybird_0.1.0_x64-setup.exe](downloads/Querybird_0.1.0_x64-setup.exe) | `aeea394b81a0e5411928ddf536c128a6bd857781db1c6bef8259d1c38cab82da` |
+| Linux | `.deb` or `.AppImage` from the **[Releases](../../releases)** page | |
 
 > macOS: until the app is notarized, the first launch may say Apple can't verify it. Right-click Querybird in
 > Applications → **Open**, or run `xattr -dr com.apple.quarantine /Applications/Querybird.app`.
+>
+> Windows: the installer isn't code-signed yet, so SmartScreen may warn on first run. Choose **More info → Run anyway**.
 
 Releases are built by GitHub Actions on each `v*` tag (`.github/workflows/release.yml`).
 
