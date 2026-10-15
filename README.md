@@ -4,10 +4,29 @@ A free, open-source database client for **PostgreSQL** and **MySQL**, built with
 Its interface follows the native, keyboard-first feel of TablePlus — but there is no license key,
 no trial and no account. Ever.
 
-Runs on macOS, Windows and Linux.
+Runs on macOS, Windows and Linux. Built-in **[Ask AI](#ask-ai)** turns plain-language questions into SQL
+with Claude or OpenAI.
 
-![Editing rows with pending changes](docs/pending-edits.jpg)
-![SQL editor with multiple result sets](docs/sql-editor.jpg)
+![Ask AI: a plain-language question turned into SQL, with the result grid](docs/ask-ai.jpg)
+
+<table>
+  <tr>
+    <td><img src="docs/table-details.jpg" alt="Browsing a table with filters and the row details panel"></td>
+    <td><img src="docs/sql-editor.jpg" alt="SQL editor with multiple result sets"></td>
+  </tr>
+  <tr>
+    <td align="center">Data grid, filters and row details</td>
+    <td align="center">SQL editor with multiple result sets</td>
+  </tr>
+  <tr>
+    <td><img src="docs/pending-edits.jpg" alt="Editing rows with pending changes"></td>
+    <td><img src="docs/welcome.jpg" alt="Connection list"></td>
+  </tr>
+  <tr>
+    <td align="center">Edits stay pending until you commit</td>
+    <td align="center">Connection list</td>
+  </tr>
+</table>
 
 ## Download
 
@@ -59,16 +78,43 @@ Releases are built by GitHub Actions on each `v*` tag (`.github/workflows/releas
 - Beautify (⌘I), saved queries (⌘S), query history
 - Export results to CSV, JSON or SQL
 
-**Ask AI (natural language → SQL)**
-- The **AI** button next to **SQL** (⌘J) opens a tab where you ask questions in plain language
-- Claude (Anthropic API key, or "Sign in with Anthropic" via the official `ant` CLI's OAuth) or OpenAI (API key)
-- Every answer shows the generated SQL, the model's explanation, the model used, timings and the result grid; the SQL is also written to the console log and history
-- Read-only SQL can run automatically; anything that changes data always asks first. "Fix with AI" retries with the database error
-- Only your question and the schema (names, types, keys) are sent — never row data. "What was sent" shows the exact context
+**Ask AI** — natural language → SQL with Claude or OpenAI; see [Ask AI](#ask-ai) below.
 
 **Safety**
 - Safe mode (lock icon): every write needs confirmation. On by default for connections tagged `production`
 - Console log of every statement Querybird runs
+
+## Ask AI
+
+Ask your database a question in plain language and Querybird writes the SQL, shows it to you, runs it and
+displays the result — all inside the same workspace window.
+
+- Click **AI** next to **SQL** in the toolbar (⌘J / Ctrl+J) to open an Ask AI tab, then type a question or
+  pick one of the suggestions
+- Every answer shows the question, the model's explanation, the generated SQL, the model used, timings and the
+  result grid. **Run again**, **Open in SQL Editor** or **Copy SQL** to keep working with it
+- Follow-up questions in the same tab see the earlier questions and SQL, so you can refine step by step
+- "Fix with AI" retries with the database error when a statement fails
+- Every generated statement is written to the console log and query history
+
+**Providers**
+
+| Provider | Sign in with | Notes |
+| --- | --- | --- |
+| Claude (Anthropic) | **Sign in with Anthropic** (browser, via the official `ant` CLI) or an Anthropic API key | Choose the Claude model in Settings → AI |
+| OpenAI | **Sign in with ChatGPT** (uses your ChatGPT plan) or an OpenAI API key | Follows OpenAI's documented open-source sign-in flow; manage usage from your ChatGPT settings |
+
+API keys and sign-in tokens are stored in the OS keychain. Querybird itself is free and never charges anything.
+
+**Safety and privacy**
+
+- Read-only SQL can run automatically (toggle **Auto-run read-only SQL**); it runs inside a server-side
+  `READ ONLY` transaction. Anything that changes data or structure always asks first
+- Only your question and the schema (table/column names, types, keys) are sent — never row data
+- **What was sent** shows the exact prompt and schema context sent to the model
+
+![The exact context sent to the model](docs/ai-context.jpg)
+![AI settings](docs/ai-settings.jpg)
 
 ## Keyboard shortcuts
 
@@ -84,6 +130,7 @@ Releases are built by GitHub Actions on each `v*` tag (`.github/workflows/releas
 | Delete selected rows | ⌘⌫ | Ctrl+Backspace / Delete |
 | Run current / all statements | ⌘↵ / ⌘⇧↵ | Ctrl+Enter / Ctrl+Shift+Enter |
 | Beautify SQL | ⌘I (in editor) | Ctrl+I |
+| Open Ask AI tab | ⌘J | Ctrl+J |
 | Previous / next tab | ⌘⇧[ / ⌘⇧] | Ctrl+Shift+[ / ] |
 | Toggle sidebar / console / details | ⌘0 / ⌘⇧E / ⌘⇧. | Ctrl+0 / Ctrl+Shift+E / Ctrl+Shift+. |
 
