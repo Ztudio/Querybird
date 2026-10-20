@@ -36,10 +36,13 @@ Installers for the current version are in [`downloads/`](downloads/):
 | --- | --- | --- |
 | macOS (Apple Silicon + Intel) | [Querybird_0.1.0_universal.dmg](downloads/Querybird_0.1.0_universal.dmg) | `3096df30ab86a15eb7aeebfe53f0bdce553b75726d78667392d0379f4b9761a1` |
 | Windows 10/11 (x64) | [Querybird_0.1.0_x64-setup.exe](downloads/Querybird_0.1.0_x64-setup.exe) | `aeea394b81a0e5411928ddf536c128a6bd857781db1c6bef8259d1c38cab82da` |
-| Linux | `.deb` or `.AppImage` from the **[Releases](../../releases)** page | |
+| Ubuntu / Debian (x64) | [Querybird_0.1.0_amd64.deb](downloads/Querybird_0.1.0_amd64.deb) | `3f4185cdcd5017ea2793b2a04261a3c6a76478fe3c096e528257fdcf7ed65ba6` |
 
 > macOS: until the app is notarized, the first launch may say Apple can't verify it. Right-click Querybird in
 > Applications → **Open**, or run `xattr -dr com.apple.quarantine /Applications/Querybird.app`.
+>
+> Ubuntu (22.04 or newer): install with `sudo apt install ./Querybird_0.1.0_amd64.deb`, which also pulls in the
+> WebKitGTK and GTK libraries it needs. Then open Querybird from the app menu or run `querybird`.
 >
 > Windows: the installer isn't code-signed yet, so SmartScreen may warn on first run. Choose **More info → Run anyway**.
 
