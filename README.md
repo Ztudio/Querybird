@@ -34,12 +34,13 @@ Installers for the current version are in [`downloads/`](downloads/):
 
 | Platform | File | SHA-256 |
 | --- | --- | --- |
-| macOS (Apple Silicon + Intel) | [Querybird_0.1.0_universal.dmg](downloads/Querybird_0.1.0_universal.dmg) | `3096df30ab86a15eb7aeebfe53f0bdce553b75726d78667392d0379f4b9761a1` |
+| macOS (Apple Silicon + Intel) | [Querybird_0.1.0_universal.dmg](downloads/Querybird_0.1.0_universal.dmg) | `e3cc1da71c7964423b9e995e4a7fc3d32327a9396f56bc608bb32e226fba7404` |
 | Windows 10/11 (x64) | [Querybird_0.1.0_x64-setup.exe](downloads/Querybird_0.1.0_x64-setup.exe) | `aeea394b81a0e5411928ddf536c128a6bd857781db1c6bef8259d1c38cab82da` |
 | Ubuntu / Debian (x64) | [Querybird_0.1.0_amd64.deb](downloads/Querybird_0.1.0_amd64.deb) | `3f4185cdcd5017ea2793b2a04261a3c6a76478fe3c096e528257fdcf7ed65ba6` |
 
-> macOS: until the app is notarized, the first launch may say Apple can't verify it. Right-click Querybird in
-> Applications → **Open**, or run `xattr -dr com.apple.quarantine /Applications/Querybird.app`.
+> macOS: the app isn't notarized yet, so the first launch says Apple could not verify it. Click **Done**, then open
+> **System Settings → Privacy & Security**, scroll to **Security** and click **Open Anyway** (you only do this once).
+> Or run `xattr -dr com.apple.quarantine /Applications/Querybird.app`.
 >
 > Ubuntu (22.04 or newer): install with `sudo apt install ./Querybird_0.1.0_amd64.deb`, which also pulls in the
 > WebKitGTK and GTK libraries it needs. Then open Querybird from the app menu or run `querybird`.
