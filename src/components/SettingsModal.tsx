@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, errorText, type AiStatus, type ChatGptStatus } from "../api";
+import { api, errorText, type AiStatus, type ChatGptStatus, type CodexModels } from "../api";
 import { CLAUDE_MODELS, DEFAULT_SETTINGS, MANAGE_USAGE_URL, getSettings, updateSettings, useSettings } from "../lib/settings";
 import { Modal } from "./ui";
 
@@ -153,8 +153,10 @@ function AiSettings() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
+  const [codex, setCodex] = useState<CodexModels | null>(null);
   const refresh = async () => {
     api.aiStatus().then(setStatus).catch(() => {});
+    api.codexModels().then(setCodex).catch(() => {});
     const g = await api.chatgptStatus().catch(() => null);
     setGpt(g);
     if (g?.signedIn && g.planUsage) {
@@ -205,10 +207,19 @@ function AiSettings() {
         <>
           <label>Connect with</label>
           <div style={{ display: "grid", gap: 6 }}>
+            <label className="row"><input type="radio" checked={s.claudeAuth === "claudeCode"} onChange={() => updateSettings({ claudeAuth: "claudeCode" })} /> Claude Code on this computer (uses its sign-in)</label>
             <label className="row"><input type="radio" checked={s.claudeAuth === "antCli"} onChange={() => updateSettings({ claudeAuth: "antCli" })} /> Sign in with Anthropic (browser)</label>
             <label className="row"><input type="radio" checked={s.claudeAuth === "apiKey"} onChange={() => updateSettings({ claudeAuth: "apiKey" })} /> Anthropic API key</label>
           </div>
-          {s.claudeAuth === "apiKey" ? (
+          {s.claudeAuth === "claudeCode" ? (
+            <LocalCli
+              name="Claude Code"
+              path={status?.claudeCodePath ?? null}
+              signIn="claude"
+              install="curl -fsSL https://claude.ai/install.sh | bash"
+              onRecheck={refresh}
+            />
+          ) : s.claudeAuth === "apiKey" ? (
             <>
               <label>API key</label>
               <div className="row">
@@ -264,10 +275,23 @@ function AiSettings() {
         <>
           <label>Connect with</label>
           <div style={{ display: "grid", gap: 6 }}>
+            <label className="row"><input type="radio" checked={s.openaiAuth === "codex"} onChange={() => updateSettings({ openaiAuth: "codex" })} /> Codex CLI on this computer (uses its sign-in)</label>
             <label className="row"><input type="radio" checked={s.openaiAuth === "chatgpt"} onChange={() => updateSettings({ openaiAuth: "chatgpt" })} /> Sign in with ChatGPT (uses your ChatGPT plan)</label>
             <label className="row"><input type="radio" checked={s.openaiAuth === "apiKey"} onChange={() => updateSettings({ openaiAuth: "apiKey" })} /> OpenAI API key</label>
           </div>
-          {s.openaiAuth === "chatgpt" ? (
+          {s.openaiAuth === "codex" ? (
+            <>
+              <LocalCli name="Codex" path={status?.codexPath ?? null} signIn="codex login" install="npm install -g @openai/codex" onRecheck={refresh} />
+              <label>Model</label>
+              <select className="input" value={s.codexModel} onChange={(e) => updateSettings({ codexModel: e.target.value })}>
+                <option value="">Codex default{codex?.default ? ` (${codex.models.find((m) => m.id === codex.default)?.label ?? codex.default})` : ""}</option>
+                {codex?.models.map((m) => (
+                  <option key={m.id} value={m.id}>{m.label}{m.description ? ` — ${m.description}` : ""}</option>
+                ))}
+                {s.codexModel && !codex?.models.some((m) => m.id === s.codexModel) && <option value={s.codexModel}>{s.codexModel}</option>}
+              </select>
+            </>
+          ) : s.openaiAuth === "chatgpt" ? (
             <>
               <label>Account</label>
               {gpt?.signedIn ? (
@@ -348,6 +372,33 @@ function AiSettings() {
             setWelcome(false);
           }}
         />
+      )}
+    </>
+  );
+}
+
+/** Status of a locally installed AI CLI (Claude Code / Codex) used for Ask AI. */
+function LocalCli({ name, path, signIn, install, onRecheck }: { name: string; path: string | null; signIn: string; install: string; onRecheck: () => void }) {
+  return (
+    <>
+      <label>{name}</label>
+      {path ? (
+        <div style={{ display: "grid", gap: 4 }}>
+          <span style={{ color: "var(--green)" }}>● Found at <code className="mono">{path}</code></span>
+          <span className="faint" style={{ fontSize: 11.5 }}>
+            Uses the account you’re signed in with there (run <code className="mono">{signIn}</code> in Terminal if you aren’t). It runs with
+            every tool turned off — it only sees your question and the schema, and can’t run commands or read files.
+          </span>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 6 }}>
+          <div style={{ fontSize: 12, color: "var(--orange)" }}>{name} isn’t installed. Install it in Terminal, then sign in with <code>{signIn}</code>:</div>
+          <div className="row">
+            <code className="mono code-box" style={{ flex: 1, padding: "5px 8px", fontSize: 11.5 }}>{install}</code>
+            <button className="btn small" onClick={() => navigator.clipboard.writeText(install)}>Copy</button>
+          </div>
+          <div><button className="btn small" onClick={onRecheck}>Check again</button></div>
+        </div>
       )}
     </>
   );

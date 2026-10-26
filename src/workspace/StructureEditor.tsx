@@ -53,7 +53,7 @@ export function StructureEditor({
     ws.setLoading(1);
     try {
       // Postgres DDL is transactional, so the batch is all-or-nothing there.
-      const done = await api.runStatements(ws.sessionId, statements, ws.driver === "postgres");
+      const done = await api.runStatements(ws.sessionId, statements, ws.driver !== "mysql");
       done.forEach(ws.log);
       setReview(null);
       ws.toast(`${done.length} structure change${done.length === 1 ? "" : "s"} applied`);
@@ -207,7 +207,11 @@ export function StructureEditor({
             <>
               <button className="btn" onClick={() => navigator.clipboard.writeText(review.join("\n"))}>Copy SQL</button>
               <span className="faint" style={{ fontSize: 11.5 }}>
-                {ws.driver === "postgres" ? "Runs in one transaction." : "MySQL applies DDL immediately; statements run in order."}
+                {ws.driver === "postgres"
+                  ? "Runs in one transaction."
+                  : ws.driver === "sqlite"
+                    ? "Runs in one transaction. SQLite can rename, add and drop columns; changing a column's type, NULL or default needs the table rebuilt (edit the CREATE TABLE in a SQL tab)."
+                    : "MySQL applies DDL immediately; statements run in order."}
               </span>
               <span className="spacer" />
               <button className="btn" onClick={() => setReview(null)}>Cancel</button>

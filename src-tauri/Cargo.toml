@@ -22,6 +22,7 @@ tokio-postgres = "0.7"
 postgres-native-tls = "0.5"
 native-tls = "0.2"
 mysql_async = { version = "0.37", default-features = false, features = ["minimal-rust", "native-tls-tls"] }
+rusqlite = { version = "0.41", features = ["bundled", "column_decltype", "backup"] }
 uuid = { version = "1", features = ["v4"] }
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
 futures-util = "0.3"

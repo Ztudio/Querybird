@@ -2,23 +2,25 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { api, errorText, type ConnectionConfig, type Driver } from "../api";
-import { IconChevron, IconPlug, IconPlus, IconSearch } from "../components/icons";
+import { IconChevron, IconDatabase, IconPencil, IconPlug, IconPlus, IconSearch, IconTrash, IconUsers } from "../components/icons";
 import { ContextMenu, DRIVERS, DriverBadge, Modal, isMac, load, save, tagColor, useToast, type MenuItem, type MenuState } from "../components/ui";
 import { BackupDialog } from "../components/BackupDialog";
 import { SettingsModal } from "../components/SettingsModal";
-import { ConnectionForm, newConfig, parseUrl } from "./ConnectionForm";
+import { NewUserDialog } from "./NewUserDialog";
+import { ConnectionForm, SQLITE_EXTENSIONS, fileStem, newConfig, parseUrl } from "./ConnectionForm";
 import "./welcome.css";
 
 type Dialog =
   | { kind: "driver"; group?: string }
   | { kind: "form"; config: ConnectionConfig; password?: string }
   | { kind: "url" }
-  | { kind: "password"; config: ConnectionConfig }
+  | { kind: "password"; config: ConnectionConfig; open?: "users" }
   | { kind: "delete"; config: ConnectionConfig }
   | { kind: "error"; text: string }
   | { kind: "group"; rename?: string }
   | { kind: "settings" }
-  | { kind: "backup" | "restore" };
+  | { kind: "backup" | "restore" }
+  | { kind: "newUser"; config?: ConnectionConfig };
 
 export function Welcome() {
   const [list, setList] = useState<ConnectionConfig[]>([]);
@@ -55,15 +57,17 @@ export function Welcome() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [list, query]);
 
-  const connect = async (c: ConnectionConfig, password?: string | null) => {
+  /** `open` names a tab the new workspace opens first (e.g. "users"). */
+  const connect = async (c: ConnectionConfig, password?: string | null, open?: "users") => {
     if (c.passwordMode === "ask" && password == null) {
-      setDialog({ kind: "password", config: c });
+      setDialog({ kind: "password", config: c, open });
       return;
     }
     setDialog(null);
     setConnecting(c.id);
     try {
       const s = await api.connect(c, password ?? null);
+      if (open) save(`querybird.open.${s.id}`, open);
       await api.openWorkspace(s.id, c.name);
     } catch (e) {
       setDialog({ kind: "error", text: errorText(e) });
@@ -105,12 +109,25 @@ export function Welcome() {
       if (e.payload === "settings") setDialog({ kind: "settings" });
       else if (e.payload === "new_connection") setDialog({ kind: "driver" });
       else if (e.payload === "backup" || e.payload === "restore") setDialog({ kind: e.payload });
+      else if (e.payload === "new_user") setDialog({ kind: "newUser" });
     });
     return () => {
       window.removeEventListener("keydown", onKey);
       un.then((f) => f());
     };
   }, []);
+
+  /** Open a SQLite file straight from the welcome window: reuse its saved connection, or create one. */
+  const openSqliteFile = async () => {
+    const path = await api.pickPath("open", { filterName: "SQLite database", extensions: SQLITE_EXTENSIONS });
+    if (!path) return;
+    const existing = list.find((c) => c.driver === "sqlite" && c.database === path);
+    if (existing) return connect(existing);
+    const saved = await api.saveConnection({ ...newConfig("sqlite"), name: fileStem(path), database: path }, null);
+    await reload();
+    setSelected(saved.id);
+    connect(saved, null);
+  };
 
   const duplicate = async (c: ConnectionConfig) => {
     const copy = await api.saveConnection({ ...c, id: "", name: `${c.name} copy` }, null);
@@ -130,7 +147,7 @@ export function Welcome() {
       setSelected(visible[Math.max(0, idx - 1)]?.id ?? null);
     } else if (e.key === "Enter" && idx >= 0) {
       connect(visible[idx]);
-    } else if ((e.key === "Backspace" || e.key === "Delete") && (e.metaKey || e.ctrlKey) && idx >= 0) {
+    } else if ((e.key === "Backspace" || e.key === "Delete") && idx >= 0) {
       setDialog({ kind: "delete", config: visible[idx] });
     }
   };
@@ -143,15 +160,26 @@ export function Welcome() {
         <div className="welcome-version" data-tauri-drag-region>Version 0.1.0</div>
         <div className="spacer" data-tauri-drag-region />
         <div className="welcome-free" data-tauri-drag-region>Free &amp; open source · no license key</div>
-        <button className="welcome-action" disabled={!list.length} onClick={() => setDialog({ kind: "backup" })}>
-          <IconBox down={false} /> Backup database...
-        </button>
-        <button className="welcome-action" disabled={!list.length} onClick={() => setDialog({ kind: "restore" })}>
-          <IconBox down /> Restore database...
-        </button>
-        <button className="welcome-action" onClick={() => setDialog({ kind: "driver" })}>
-          <IconPlug /> Create connection...
-        </button>
+        {/* Server tools, then ways to open a database: grouped by space rather than lines. */}
+        <div className="welcome-actions">
+          <button className="welcome-action" disabled={!list.length} onClick={() => setDialog({ kind: "backup" })}>
+            <IconBox down={false} /> Backup database…
+          </button>
+          <button className="welcome-action" disabled={!list.length} onClick={() => setDialog({ kind: "restore" })}>
+            <IconBox down /> Restore database…
+          </button>
+          <button className="welcome-action" disabled={!list.some((c) => c.driver !== "sqlite")} onClick={() => setDialog({ kind: "newUser", config: list.find((c) => c.id === selected) })}>
+            <IconUsers /> New database user…
+          </button>
+        </div>
+        <div className="welcome-actions">
+          <button className="welcome-action" onClick={openSqliteFile}>
+            <IconDatabase /> Open SQLite file…
+          </button>
+          <button className="welcome-action" onClick={() => setDialog({ kind: "driver" })}>
+            <IconPlug /> Create connection…
+          </button>
+        </div>
       </div>
       <div className="welcome-right">
         <div className="welcome-head" data-tauri-drag-region>
@@ -160,7 +188,7 @@ export function Welcome() {
           </button>
           <div className="search" style={{ flex: 1 }}>
             <IconSearch />
-            <input className="input" placeholder="Search for connection..." value={query} onChange={(e) => setQuery(e.target.value)} style={{ height: 30 }} />
+            <input className="input" placeholder="Search for connection…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ height: 30 }} />
           </div>
           <button className="icon-btn" title="Settings (⌘,)" onClick={() => setDialog({ kind: "settings" })}>
             <IconGear />
@@ -179,8 +207,8 @@ export function Welcome() {
                       x: e.clientX,
                       y: e.clientY,
                       items: [
-                        { label: "New connection in group...", onClick: () => setDialog({ kind: "driver", group: sec.group }) },
-                        { label: "Rename group...", onClick: () => setDialog({ kind: "group", rename: sec.group }) },
+                        { label: "New connection in group…", onClick: () => setDialog({ kind: "driver", group: sec.group }) },
+                        { label: "Rename group…", onClick: () => setDialog({ kind: "group", rename: sec.group }) },
                         { separator: true },
                         {
                           label: "Delete group (keeps connections)",
@@ -213,15 +241,21 @@ export function Welcome() {
                   { label: "No group", disabled: !c.group, onClick: () => moveToGroup(c, "") },
                   ...groups.map((g) => ({ label: g, disabled: g === c.group, onClick: () => moveToGroup(c, g) })),
                   { separator: true },
-                  { label: "New group...", onClick: () => setDialog({ kind: "group" }) },
+                  { label: "New group…", onClick: () => setDialog({ kind: "group" }) },
                 ];
                 setMenu({
                   x: e.clientX,
                   y: e.clientY,
                   items: [
                     { label: "Connect", onClick: () => connect(c) },
+                    ...(c.driver !== "sqlite"
+                      ? [
+                          { label: "New user on this server…", onClick: () => setDialog({ kind: "newUser", config: c }) },
+                          { label: "Manage users…", onClick: () => connect(c, undefined, "users") },
+                        ]
+                      : []),
                     { separator: true },
-                    { label: "Edit...", onClick: () => setDialog({ kind: "form", config: c }) },
+                    { label: "Edit…", onClick: () => setDialog({ kind: "form", config: c }) },
                     { label: "Duplicate", onClick: () => duplicate(c) },
                     { label: "Move to group", submenu: groupItems },
                     {
@@ -232,7 +266,7 @@ export function Welcome() {
                       ],
                     },
                     { separator: true },
-                    { label: "Delete", danger: true, onClick: () => setDialog({ kind: "delete", config: c }) },
+                    { label: "Delete", kbd: "⌫", danger: true, onClick: () => setDialog({ kind: "delete", config: c }) },
                   ],
                 });
               }}
@@ -244,9 +278,20 @@ export function Welcome() {
                   {c.name} <span style={{ color: selected === c.id ? "inherit" : tagColor(c.tag) }}>({c.tag})</span>
                   {c.ssh?.enabled && <span className="conn-ssh">SSH</span>}
                 </div>
-                <div className="conn-sub">
-                  {connecting === c.id ? "Connecting…" : `${c.host}${c.port ? `:${c.port}` : ""} : ${c.database || "—"}`}
+                <div className="conn-sub" title={c.driver === "sqlite" ? c.database : undefined}>
+                  {connecting === c.id
+                    ? "Connecting…"
+                    : c.driver === "sqlite"
+                      ? c.database || "—"
+                      : `${c.host}${c.port ? `:${c.port}` : ""} : ${c.database || "—"}`}
                 </div>
+              </div>
+              <div className="conn-actions" onDoubleClick={(e) => e.stopPropagation()}>
+                {c.driver !== "sqlite" && (
+                  <button title="Manage users" onClick={() => connect(c, undefined, "users")}><IconUsers size={15} /></button>
+                )}
+                <button title="Edit connection" onClick={() => setDialog({ kind: "form", config: c })}><IconPencil /></button>
+                <button title="Delete connection (⌫)" className="danger" onClick={() => setDialog({ kind: "delete", config: c })}><IconTrash /></button>
               </div>
             </div>
                 ))}
@@ -297,6 +342,15 @@ export function Welcome() {
           onDone={(m) => toast.show(m)}
         />
       )}
+      {dialog?.kind === "newUser" && (
+        <NewUserDialog
+          connections={list}
+          initial={dialog.config}
+          onClose={() => setDialog(null)}
+          onDone={(m) => toast.show(m)}
+          onManage={(c) => connect(c, undefined, "users")}
+        />
+      )}
       {toast.node}
       {dialog?.kind === "form" && (
         <ConnectionForm
@@ -312,7 +366,7 @@ export function Welcome() {
         />
       )}
       {dialog?.kind === "url" && <UrlImport onClose={() => setDialog(null)} onParsed={(config, password) => setDialog({ kind: "form", config, password })} />}
-      {dialog?.kind === "password" && <PasswordPrompt config={dialog.config} onClose={() => setDialog(null)} onSubmit={(pw) => connect(dialog.config, pw)} />}
+      {dialog?.kind === "password" && <PasswordPrompt config={dialog.config} onClose={() => setDialog(null)} onSubmit={(pw) => connect(dialog.config, pw, dialog.open)} />}
       {dialog?.kind === "delete" && (
         <Modal
           title="Delete connection?"
@@ -439,7 +493,7 @@ function UrlImport({ onClose, onParsed }: { onClose: () => void; onParsed: (c: C
       onClose={onClose}
       footer={
         <>
-          <span className="faint" style={{ fontSize: 11.5 }}>Supports postgresql:// and mysql:// URLs</span>
+          <span className="faint" style={{ fontSize: 11.5 }}>Supports postgresql://, mysql:// and sqlite:///path (or a .sqlite file path)</span>
           <span className="spacer" />
           <button className="btn" onClick={onClose}>Cancel</button>
           <button className="btn primary" disabled={!parsed} onClick={() => parsed && onParsed(parsed.config, parsed.password)}>Import</button>

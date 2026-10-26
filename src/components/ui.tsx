@@ -131,6 +131,7 @@ export function useToast() {
 export const DRIVERS: { id: Driver; label: string; short: string; color: string; port: number; user: string }[] = [
   { id: "postgres", label: "PostgreSQL", short: "Pg", color: "#2f76c8", port: 5432, user: "postgres" },
   { id: "mysql", label: "MySQL", short: "Ms", color: "#e8862a", port: 3306, user: "root" },
+  { id: "sqlite", label: "SQLite", short: "Sq", color: "#4a9bc4", port: 0, user: "" },
 ];
 
 export function DriverBadge({ driver, size = 26 }: { driver: Driver; size?: number }) {

@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export type Driver = "postgres" | "mysql";
+export type Driver = "postgres" | "mysql" | "sqlite";
 export type SslMode = "disable" | "prefer" | "require" | "verify-full";
 export type PasswordMode = "keychain" | "ask";
 
@@ -142,9 +142,53 @@ export interface SessionInfo {
   schema: string;
 }
 
+export interface DbUser {
+  name: string;
+  /** MySQL account host; empty for Postgres roles. */
+  host: string;
+  superuser: boolean;
+  canLogin: boolean;
+  createDb: boolean;
+  createRole: boolean;
+  locked: boolean;
+  connLimit: number | null;
+  validUntil: string | null;
+  memberOf: string[];
+}
+
+export interface UserSpec {
+  name: string;
+  host: string;
+  /** New password; null/empty keeps the current one. */
+  password: string | null;
+  superuser: boolean;
+  canLogin: boolean;
+  createDb: boolean;
+  createRole: boolean;
+  locked: boolean;
+  connLimit: number | null;
+  validUntil: string | null;
+}
+
+export type AccessLevel = "readOnly" | "readWrite" | "all";
+
+export type UserAction =
+  | { action: "create"; user: UserSpec }
+  | { action: "alter"; name: string; host: string; user: UserSpec }
+  | { action: "drop"; name: string; host: string }
+  | { action: "grant"; name: string; host: string; database: string; schema: string; level: AccessLevel; revoke: boolean }
+  | { action: "membership"; name: string; role: string; revoke: boolean }
+  | { action: "createDatabase"; name: string; host: string; database: string };
+
+export interface CodexModels {
+  /** The model Codex uses when none is chosen (its config.toml). */
+  default: string | null;
+  models: { id: string; label: string; description: string }[];
+}
+
 export type AiProvider = "claude" | "openai";
-export type ClaudeAuth = "apiKey" | "antCli";
-export type OpenaiAuth = "apiKey" | "chatgpt";
+export type ClaudeAuth = "apiKey" | "antCli" | "claudeCode";
+export type OpenaiAuth = "apiKey" | "chatgpt" | "codex";
 
 export interface ChatGptStatus {
   signedIn: boolean;
@@ -172,6 +216,10 @@ export interface AiStatus {
   openaiKey: boolean;
   antInstalled: boolean;
   antPath: string | null;
+  /** Local Claude Code CLI, if installed. */
+  claudeCodePath: string | null;
+  /** Local Codex CLI, if installed. */
+  codexPath: string | null;
 }
 
 export const api = {
@@ -209,6 +257,8 @@ export const api = {
   aiSetKey: (provider: AiProvider, key: string) => invoke<void>("ai_set_key", { provider, key }),
   aiClearKey: (provider: AiProvider) => invoke<void>("ai_clear_key", { provider }),
   aiAntLogin: () => invoke<string>("ai_ant_login"),
+  /** Models the local Codex CLI offers, from its own cached list. */
+  codexModels: () => invoke<CodexModels>("codex_models"),
   chatgptStatus: () => invoke<ChatGptStatus>("chatgpt_status"),
   chatgptSignIn: () => invoke<ChatGptStatus>("chatgpt_sign_in"),
   chatgptSignOut: () => invoke<string>("chatgpt_sign_out"),
@@ -230,6 +280,14 @@ export const api = {
   searchDatabase: (sessionId: string, schema: string, term: string) =>
     invoke<SearchHit[]>("search_database", { sessionId, schema, term }),
   killProcess: (sessionId: string, pid: string) => invoke<void>("kill_process", { sessionId, pid }),
+  listUsers: (sessionId: string) => invoke<DbUser[]>("list_users", { sessionId }),
+  userGrants: (sessionId: string, name: string, host: string) => invoke<string[]>("user_grants", { sessionId, name, host }),
+  /** Statements an action would run, passwords masked. */
+  userPreview: (sessionId: string, action: UserAction) => invoke<string[]>("user_preview", { sessionId, action }),
+  /** Runs the action; returns the masked statements for the console log. */
+  userApply: (sessionId: string, action: UserAction) => invoke<string[]>("user_apply", { sessionId, action }),
+  /** Creates an empty SQLite file at a path picked with pickPath("save"). */
+  createSqliteFile: (path: string) => invoke<void>("create_sqlite_file", { path }),
   backupDatabase: (config: ConnectionConfig, password: string | null, database: string, path: string, customFormat: boolean, toolsDir: string | null) =>
     invoke<string>("backup_database", { config, password, database, path, customFormat, toolsDir }),
   restoreDatabase: (config: ConnectionConfig, password: string | null, database: string, path: string, toolsDir: string | null) =>

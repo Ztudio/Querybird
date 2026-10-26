@@ -5,7 +5,7 @@ import { defaultKeymap, history, historyKeymap, indentWithTab, toggleBlockCommen
 import { autocompletion, closeBrackets, completionKeymap } from "@codemirror/autocomplete";
 import { bracketMatching, HighlightStyle, syntaxHighlighting, indentOnInput } from "@codemirror/language";
 import { searchKeymap, highlightSelectionMatches, openSearchPanel } from "@codemirror/search";
-import { sql, PostgreSQL, MySQL } from "@codemirror/lang-sql";
+import { sql, PostgreSQL, MySQL, SQLite } from "@codemirror/lang-sql";
 import { tags as t } from "@lezer/highlight";
 import type { Driver } from "../api";
 import { useSettings } from "../lib/settings";
@@ -99,7 +99,7 @@ export const SqlEditor = forwardRef<SqlEditorHandle, Props>(function SqlEditor(p
           syntaxHighlighting(highlight),
           placeholder("-- Write your SQL here. ⌘↵ runs the statement under the cursor."),
           keymap.of([...completionKeymap, ...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
-          lang.current.of(sql({ dialect: props.driver === "mysql" ? MySQL : PostgreSQL, upperCaseKeywords: settings.uppercaseKeywords })),
+          lang.current.of(sql({ dialect: props.driver === "mysql" ? MySQL : props.driver === "sqlite" ? SQLite : PostgreSQL, upperCaseKeywords: settings.uppercaseKeywords })),
           theme,
           EditorView.updateListener.of((u) => {
             if (u.docChanged) cb.current.onChange(u.state.doc.toString());
@@ -122,7 +122,7 @@ export const SqlEditor = forwardRef<SqlEditorHandle, Props>(function SqlEditor(p
     view.current?.dispatch({
       effects: [
         lang.current.reconfigure(
-          sql({ dialect: props.driver === "mysql" ? MySQL : PostgreSQL, schema, upperCaseKeywords: settings.uppercaseKeywords }),
+          sql({ dialect: props.driver === "mysql" ? MySQL : props.driver === "sqlite" ? SQLite : PostgreSQL, schema, upperCaseKeywords: settings.uppercaseKeywords }),
         ),
         brackets.current.reconfigure(settings.closeBrackets ? closeBrackets() : []),
       ],

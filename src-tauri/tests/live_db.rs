@@ -11,7 +11,7 @@ fn enabled() -> bool {
 fn cfg(driver: Driver) -> ConnectionConfig {
     let (port, user) = match driver {
         Driver::Postgres => (55432, "postgres"),
-        Driver::Mysql => (53306, "root"),
+        _ => (53306, "root"),
     };
     ConnectionConfig {
         id: String::new(),
@@ -47,7 +47,7 @@ async fn exercise(driver: Driver) {
     eprintln!("connected to {:?} {}", driver, s.server_version);
     let schema = match driver {
         Driver::Postgres => "public",
-        Driver::Mysql => "shop",
+        _ => "shop",
     };
 
     let schemas = s.list_schemas().await.unwrap();
@@ -362,12 +362,12 @@ async fn exercise(driver: Driver) {
     let mut b = cfg(driver);
     b.bootstrap = match driver {
         Driver::Postgres => "SET application_name = 'rb-bootstrap'".into(),
-        Driver::Mysql => "SET @rb_boot = 'rb-bootstrap'".into(),
+        _ => "SET @rb_boot = 'rb-bootstrap'".into(),
     };
     let s2 = Session::open("b".into(), b, None).await.unwrap();
     let probe = match driver {
         Driver::Postgres => "SHOW application_name",
-        Driver::Mysql => "SELECT @rb_boot",
+        _ => "SELECT @rb_boot",
     };
     assert_eq!(
         s2.execute(probe).await.unwrap()[0].rows[0][0].as_deref(),
@@ -526,5 +526,183 @@ async fn backup_and_restore() {
     .await;
     if let Err(e) = e {
         assert!(e.contains("pg_dump") || e.contains("exited"), "{e}");
+    }
+}
+
+fn action(v: serde_json::Value) -> querybird_lib::db::users::UserAction {
+    serde_json::from_value(v).expect("valid user action")
+}
+
+/// Creates a login, grants read-only then read-write access, connects as it, renames it and drops it.
+async fn manage_users(driver: Driver) {
+    let admin = Session::open("admin".into(), cfg(driver), None)
+        .await
+        .expect("connect as admin");
+    let my = driver == Driver::Mysql;
+    let (db, schema) = if my { ("shop", "") } else { ("shop", "public") };
+    let pw = "p'w\\x \"q";
+    // Leftovers from an earlier failed run.
+    for n in ["qb_user", "qb_user2", "qb_group"] {
+        let _ = admin
+            .user_apply(&action(
+                serde_json::json!({"action": "drop", "name": n, "host": "%"}),
+            ))
+            .await;
+    }
+
+    let create = action(serde_json::json!({
+        "action": "create",
+        "user": {"name": "qb_user", "host": "%", "password": pw, "canLogin": true}
+    }));
+    let shown = admin.user_apply(&create).await.expect("create user");
+    assert!(
+        shown
+            .iter()
+            .all(|s| !s.contains("p'w") && !s.contains("p''w")),
+        "{shown:?}"
+    );
+    let dup = admin
+        .user_apply(&create)
+        .await
+        .expect_err("duplicate create fails");
+    assert!(
+        !dup.contains("p''w") && !dup.contains("p'w"),
+        "password leaked in error: {dup}"
+    );
+    assert!(admin
+        .list_users()
+        .await
+        .unwrap()
+        .iter()
+        .any(|u| u.name == "qb_user"));
+
+    let grant = |level: &str| {
+        action(serde_json::json!({
+            "action": "grant", "name": "qb_user", "host": "%", "database": db, "schema": schema, "level": level
+        }))
+    };
+    // A database of its own: the user can create tables in it.
+    let _ = admin.execute("DROP DATABASE IF EXISTS qb_user_db").await;
+    admin
+        .user_apply(&action(serde_json::json!({
+            "action": "createDatabase", "name": "qb_user", "host": "%", "database": "qb_user_db"
+        })))
+        .await
+        .expect("create database for user");
+    {
+        let mut c = cfg(driver);
+        c.user = "qb_user".into();
+        c.database = "qb_user_db".into();
+        let own = Session::open("own".into(), c, Some(pw))
+            .await
+            .expect("log in to own database");
+        own.execute("CREATE TABLE notes (id INT PRIMARY KEY)")
+            .await
+            .expect("owner can create tables");
+    }
+    admin
+        .execute("DROP DATABASE qb_user_db")
+        .await
+        .expect("clean up database");
+
+    admin
+        .user_apply(&grant("readOnly"))
+        .await
+        .expect("grant read-only");
+    let grants = admin.user_grants("qb_user", "%").await.unwrap();
+    assert!(grants.iter().any(|g| g.contains("SELECT")), "{grants:?}");
+
+    let as_user = |name: &str, password: &str| {
+        let mut c = cfg(driver);
+        c.user = name.into();
+        let password = password.to_string();
+        async move { Session::open("u".into(), c, Some(&password)).await }
+    };
+    let u = as_user("qb_user", pw)
+        .await
+        .expect("log in with the new password");
+    assert!(u.execute("SELECT COUNT(*) FROM customers").await.is_ok());
+    assert!(
+        u.execute("UPDATE customers SET name = name WHERE id = 1")
+            .await
+            .is_err(),
+        "read-only user must not write"
+    );
+    drop(u);
+
+    admin
+        .user_apply(&grant("readWrite"))
+        .await
+        .expect("grant read-write");
+    let u = as_user("qb_user", pw).await.unwrap();
+    u.execute("UPDATE customers SET name = name WHERE id = 1")
+        .await
+        .expect("read-write user can write");
+    drop(u);
+
+    let alter = action(serde_json::json!({
+        "action": "alter", "name": "qb_user", "host": "%",
+        "user": {"name": "qb_user2", "host": "%", "password": "second", "canLogin": true, "locked": false}
+    }));
+    admin
+        .user_apply(&alter)
+        .await
+        .expect("rename + new password");
+    assert!(as_user("qb_user2", "second").await.is_ok());
+    // The test Postgres trusts every local login, so only MySQL actually checks passwords here.
+    if my {
+        assert!(
+            as_user("qb_user2", pw).await.is_err(),
+            "old password must stop working"
+        );
+    }
+
+    if !my {
+        admin
+            .user_apply(&action(serde_json::json!({"action": "create", "user": {"name": "qb_group", "canLogin": false}})))
+            .await
+            .unwrap();
+        admin
+            .user_apply(&action(
+                serde_json::json!({"action": "membership", "name": "qb_user2", "role": "qb_group"}),
+            ))
+            .await
+            .unwrap();
+        let u = admin.list_users().await.unwrap();
+        let me = u.iter().find(|u| u.name == "qb_user2").unwrap();
+        assert_eq!(me.member_of, vec!["qb_group".to_string()]);
+        admin
+            .user_apply(&action(
+                serde_json::json!({"action": "drop", "name": "qb_group"}),
+            ))
+            .await
+            .unwrap();
+    }
+
+    admin
+        .user_apply(&action(
+            serde_json::json!({"action": "drop", "name": "qb_user2", "host": "%"}),
+        ))
+        .await
+        .expect("drop user that holds privileges");
+    assert!(!admin
+        .list_users()
+        .await
+        .unwrap()
+        .iter()
+        .any(|u| u.name.starts_with("qb_user")));
+}
+
+#[tokio::test]
+async fn postgres_users() {
+    if enabled() {
+        manage_users(Driver::Postgres).await;
+    }
+}
+
+#[tokio::test]
+async fn mysql_users() {
+    if enabled() {
+        manage_users(Driver::Mysql).await;
     }
 }

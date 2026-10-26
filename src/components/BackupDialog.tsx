@@ -24,13 +24,19 @@ export function BackupDialog({
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const needsPassword = conn?.passwordMode === "ask";
+  const isFile = conn?.driver === "sqlite";
+  const needsPassword = conn?.passwordMode === "ask" && !isFile;
 
   const run = async () => {
     if (!conn) return;
     setError(null);
     let path: string | null;
-    if (mode === "backup") {
+    if (isFile && mode === "backup") {
+      const stem = (conn.database.split(/[\\/]/).pop() ?? "database").replace(/\.[^.]+$/, "");
+      path = await api.pickPath("save", { defaultName: `${stem}-${new Date().toISOString().slice(0, 10)}.sqlite`, filterName: "SQLite database", extensions: ["sqlite", "db"] });
+    } else if (isFile) {
+      path = await api.pickPath("open", { filterName: "SQLite database or SQL script", extensions: ["sqlite", "sqlite3", "db", "db3", "sql"] });
+    } else if (mode === "backup") {
       const ext = custom ? "dump" : "sql";
       path = await api.pickPath("save", { defaultName: `${database || conn.name}-${new Date().toISOString().slice(0, 10)}.${ext}`, filterName: ext.toUpperCase(), extensions: [ext] });
     } else {
@@ -62,7 +68,7 @@ export function BackupDialog({
           <span className="spacer" />
           <button className="btn" onClick={onClose}>Cancel</button>
           <button className={`btn ${mode === "restore" ? "danger" : "primary"}`} disabled={!conn || !database || busy} onClick={run}>
-            {busy ? (mode === "backup" ? "Backing up…" : "Restoring…") : mode === "backup" ? "Start backup..." : "Choose file & restore..."}
+            {busy ? (mode === "backup" ? "Backing up…" : "Restoring…") : mode === "backup" ? "Start backup…" : "Choose file & restore…"}
           </button>
         </>
       }
@@ -81,11 +87,11 @@ export function BackupDialog({
               setDatabase(connections.find((c) => c.id === e.target.value)?.database ?? "");
             }}
           >
-            {connections.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.host})</option>)}
+            {connections.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.driver === "sqlite" ? "SQLite" : c.host})</option>)}
           </select>
         </div>
-        <label>Database</label>
-        <input className="input mono" value={database} onChange={(e) => setDatabase(e.target.value)} placeholder="database name" />
+        <label>{isFile ? "File" : "Database"}</label>
+        <input className="input mono" value={database} disabled={isFile} onChange={(e) => setDatabase(e.target.value)} placeholder="database name" />
         {needsPassword && (
           <>
             <label>Password</label>
@@ -105,8 +111,14 @@ export function BackupDialog({
           <>
             <span />
             <div className="faint" style={{ fontSize: 12 }}>
-              Statements in the file run against <b>{database || "the database"}</b>. Make sure it’s the right target —
-              and only restore dumps you trust: dump files can contain client commands.
+              {isFile ? (
+                <>A .sql script runs in one transaction; choosing another SQLite file <b>replaces everything</b> in {database}.</>
+              ) : (
+                <>
+                  Statements in the file run against <b>{database || "the database"}</b>. Make sure it’s the right target —
+                  and only restore dumps you trust: dump files can contain client commands.
+                </>
+              )}
             </div>
           </>
         )}

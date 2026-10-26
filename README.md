@@ -1,6 +1,6 @@
 # Querybird
 
-A free, open-source database client for **PostgreSQL** and **MySQL**, built with Rust and Tauri.
+A free, open-source database client for **PostgreSQL**, **MySQL** and **SQLite**, built with Rust and Tauri.
 Its interface follows the native, keyboard-first feel of TablePlus — but there is no license key,
 no trial and no account. Ever.
 
@@ -53,7 +53,8 @@ Releases are built by GitHub Actions on each `v*` tag (`.github/workflows/releas
 
 **Connections**
 - Connection list with search, driver badges, tags (local / development / testing / staging / production) and status colors
-- Create, edit, duplicate, delete; import from a `postgresql://` or `mysql://` URL
+- Create, edit, duplicate, delete; import from a `postgresql://`, `mysql://` or `sqlite:///path` URL
+- **SQLite**: open a database file (or create a new one) from the welcome window — no server needed
 - Passwords stored in the OS keychain (macOS Keychain, Windows Credential Manager, Secret Service on Linux) — or asked every time
 - SSL modes: disable / preferred / required
 - **SSH tunnels** (password or private key, host key remembered on first connect)
@@ -72,7 +73,8 @@ Releases are built by GitHub Actions on each `v*` tag (`.github/workflows/releas
 - Quick Look editor for long values and JSON, quick filters, copy rows as CSV / JSON / Markdown / SQL
 - Structure editor: rename, retype, nullability, defaults, comments, add/drop columns and indexes — review the ALTERs, then commit
 - Import from CSV (with column mapping) or SQL dump; export tables to CSV / JSON / SQL
-- Item overview, process list with kill, user list, search across every table
+- Item overview, process list with kill, search across every table
+- **User management** (PostgreSQL & MySQL): create, edit, rename and delete users/roles, generate passwords, give read-only / read & write / full access to a database or schema in one click, manage role membership, see current privileges — every statement is previewed first, with passwords masked
 - Paging with stable ordering (primary key), hide/show columns
 - Details panel shows the focused row as an editable form, or table info (size, rows, engine…)
 
@@ -105,15 +107,24 @@ displays the result — all inside the same workspace window.
 
 | Provider | Sign in with | Notes |
 | --- | --- | --- |
-| Claude (Anthropic) | **Sign in with Anthropic** (browser, via the official `ant` CLI) or an Anthropic API key | Choose the Claude model in Settings → AI |
-| OpenAI | **Sign in with ChatGPT** (uses your ChatGPT plan) or an OpenAI API key | Follows OpenAI's documented open-source sign-in flow; manage usage from your ChatGPT settings |
+| Claude (Anthropic) | **Claude Code on this computer**, **Sign in with Anthropic** (browser, via the official `ant` CLI) or an Anthropic API key | Choose the Claude model in Settings → AI |
+| OpenAI | **Codex CLI on this computer**, **Sign in with ChatGPT** (uses your ChatGPT plan) or an OpenAI API key | Follows OpenAI's documented open-source sign-in flow; manage usage from your ChatGPT settings |
+
+If Claude Code (`claude`) or the Codex CLI (`codex`) is installed and nothing else is set up, Ask AI uses it
+automatically with the account it's already signed in with. Each question runs one headless call with every
+tool disabled (no shell, files, web, browser or MCP servers), no saved session, and an empty private working
+folder; the prompt is passed through stdin and a private temp file, never the command line.
 
 API keys and sign-in tokens are stored in the OS keychain. Querybird itself is free and never charges anything.
 
 **Safety and privacy**
 
-- Read-only SQL can run automatically (toggle **Auto-run read-only SQL**); it runs inside a server-side
-  `READ ONLY` transaction. Anything that changes data or structure always asks first
+- Read-only SQL can run automatically (toggle **Auto-run**); it runs inside a server-side
+  `READ ONLY` transaction, so the database itself refuses writes
+- Anything that changes data or structure never runs without your confirmation. The dialog shows the impact
+  first — for `DELETE`/`UPDATE` a read-only `COUNT(*)` of the rows it would touch, without running the statement —
+  and `DROP`, `TRUNCATE`, destructive `ALTER`s, `DELETE`/`UPDATE` without `WHERE` or over 1,000 rows need an
+  explicit "I understand" tick. Cancel has keyboard focus, so Enter never runs a write
 - Only your question and the schema (table/column names, types, keys) are sent — never row data
 - **What was sent** shows the exact prompt and schema context sent to the model
 

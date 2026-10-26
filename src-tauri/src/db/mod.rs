@@ -1,8 +1,10 @@
 pub mod mysql;
 pub mod pg;
 pub mod sqlgen;
+pub mod sqlite;
 pub mod tunnel;
 pub mod types;
+pub mod users;
 
 use tokio::sync::Mutex;
 
@@ -12,6 +14,17 @@ use types::*;
 pub enum Conn {
     Pg(tokio_postgres::Client),
     My(mysql_async::Conn),
+    Lite(rusqlite::Connection),
+}
+
+/// SQLite calls block; on the app's multi-threaded runtime let other tasks move off this worker.
+fn blocking<T>(f: impl FnOnce() -> T) -> T {
+    match tokio::runtime::Handle::try_current() {
+        Ok(h) if h.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread => {
+            tokio::task::block_in_place(f)
+        }
+        _ => f(),
+    }
 }
 
 /// One live connection. All work on it is serialized through `conn`.
@@ -30,7 +43,11 @@ pub struct Session {
 pub async fn via_tunnel(
     config: &ConnectionConfig,
 ) -> Result<(ConnectionConfig, Option<tunnel::Tunnel>), String> {
-    match config.ssh.as_ref().filter(|s| s.enabled) {
+    let ssh = config
+        .ssh
+        .as_ref()
+        .filter(|s| s.enabled && config.driver != Driver::Sqlite);
+    match ssh {
         None => Ok((config.clone(), None)),
         Some(ssh) => {
             let host = if config.host.is_empty() {
@@ -73,6 +90,11 @@ impl Session {
                 let v = mysql::server_version(&mut c).await;
                 let s = mysql::current_schema(&mut c).await;
                 (Conn::My(c), v, s)
+            }
+            Driver::Sqlite => {
+                let c = blocking(|| sqlite::connect(&target))?;
+                let v = sqlite::server_version(&c);
+                (Conn::Lite(c), v, "main".to_string())
             }
         };
         let session = Session {
@@ -133,6 +155,7 @@ impl Session {
                 let _ = c.query_drop("SET SESSION MAX_EXECUTION_TIME = 0").await;
                 res
             }
+            Conn::Lite(c) => blocking(|| sqlite::execute_readonly(c, trimmed)),
         }
     }
 
@@ -158,6 +181,7 @@ impl Session {
         match &mut *self.conn.lock().await {
             Conn::Pg(c) => pg::execute(c, sql).await,
             Conn::My(c) => mysql::execute(c, sql).await,
+            Conn::Lite(c) => blocking(|| sqlite::execute(c, sql)),
         }
     }
 
@@ -165,6 +189,7 @@ impl Session {
         match &mut *self.conn.lock().await {
             Conn::Pg(c) => pg::list_schemas(c).await,
             Conn::My(c) => mysql::list_schemas(c).await,
+            Conn::Lite(c) => sqlite::list_schemas(c),
         }
     }
 
@@ -172,6 +197,7 @@ impl Session {
         match &mut *self.conn.lock().await {
             Conn::Pg(c) => pg::set_schema(c, schema).await?,
             Conn::My(c) => mysql::set_schema(c, schema).await?,
+            Conn::Lite(c) => sqlite::set_schema(c, schema)?,
         }
         *self.schema.lock().await = schema.to_string();
         Ok(())
@@ -181,6 +207,7 @@ impl Session {
         match &mut *self.conn.lock().await {
             Conn::Pg(c) => pg::list_objects(c, schema).await,
             Conn::My(c) => mysql::list_objects(c, schema).await,
+            Conn::Lite(c) => sqlite::list_objects(c, schema),
         }
     }
 
@@ -188,6 +215,7 @@ impl Session {
         match &mut *self.conn.lock().await {
             Conn::Pg(c) => pg::structure(c, schema, table).await,
             Conn::My(c) => mysql::structure(c, schema, table).await,
+            Conn::Lite(c) => sqlite::structure(c, schema, table),
         }
     }
 
@@ -199,6 +227,7 @@ impl Session {
         match &mut *self.conn.lock().await {
             Conn::Pg(c) => pg::table_info(c, schema, table).await,
             Conn::My(c) => mysql::table_info(c, schema, table).await,
+            Conn::Lite(c) => blocking(|| sqlite::table_info(c, schema, table)),
         }
     }
 
@@ -206,13 +235,15 @@ impl Session {
         match &mut *self.conn.lock().await {
             Conn::Pg(c) => pg::ddl(c, schema, table).await,
             Conn::My(c) => mysql::ddl(c, schema, table).await,
+            Conn::Lite(c) => sqlite::ddl(c, schema, table),
         }
     }
 
-    pub fn process_list_sql(&self) -> &'static str {
+    pub fn process_list_sql(&self) -> Result<&'static str, String> {
         match self.config.driver {
-            Driver::Postgres => pg::PROCESS_LIST,
-            Driver::Mysql => mysql::PROCESS_LIST,
+            Driver::Postgres => Ok(pg::PROCESS_LIST),
+            Driver::Mysql => Ok(mysql::PROCESS_LIST),
+            Driver::Sqlite => Err(NO_SERVER.into()),
         }
     }
 
@@ -297,6 +328,8 @@ impl Session {
                 d.literal(schema),
                 d.literal(table)
             ),
+            // COUNT(*) on a local file is fast enough; there is no planner estimate to read.
+            Driver::Sqlite => return None,
         };
         self.scalar(&sql)
             .await?
@@ -329,6 +362,7 @@ impl Session {
                  FROM information_schema.TABLES WHERE TABLE_SCHEMA = {} ORDER BY TABLE_NAME",
                 d.literal(schema)
             ),
+            Driver::Sqlite => sqlite::overview_sql(schema),
         };
         self.execute(&sql)
             .await?
@@ -362,6 +396,11 @@ impl Session {
                         format!("CAST({} AS TEXT) ILIKE {pattern}", d.ident(&c.name))
                     }
                     Driver::Mysql => format!("{} LIKE {pattern}", d.ident(&c.name)),
+                    // SQLite's LIKE has no default escape character.
+                    Driver::Sqlite => format!(
+                        "CAST({} AS TEXT) LIKE {pattern} ESCAPE '\\'",
+                        d.ident(&c.name)
+                    ),
                 })
                 .collect::<Vec<_>>()
                 .join(" OR ");
@@ -393,6 +432,7 @@ impl Session {
         let sql = match self.config.driver {
             Driver::Postgres => format!("SELECT pg_terminate_backend({pid})"),
             Driver::Mysql => format!("KILL {pid}"),
+            Driver::Sqlite => return Err(NO_SERVER.into()),
         };
         self.execute(&sql).await.map(|_| ())
     }
@@ -441,6 +481,7 @@ impl Session {
                     c.query_drop("COMMIT").await.map_err(mysql::err)?;
                 }
             }
+            Conn::Lite(c) => blocking(|| sqlite::run_statements(c, statements, transaction))?,
         }
         Ok(statements.to_vec())
     }
@@ -458,6 +499,9 @@ impl Session {
 }
 
 const ESTIMATE_THRESHOLD: u64 = 500_000;
+
+pub const NO_SERVER: &str =
+    "SQLite is a local file: there is no server, process list or user accounts.";
 
 /// Hard cap on rows per page so a request can't make Querybird buffer an unbounded table.
 pub const MAX_PAGE_ROWS: u64 = 100_000;
@@ -488,6 +532,10 @@ const DENY_FUNCTIONS: &[&str] = &[
     "release_lock",
     "sys_exec",
     "sys_eval",
+    "load_extension",
+    "readfile",
+    "writefile",
+    "fts3_tokenizer",
 ];
 
 /// Cheap lexical gate before the server-side checks. Strips string literals and comments first so
@@ -503,6 +551,7 @@ pub fn check_readonly_text(driver: Driver, sql: &str) -> Result<(), String> {
         Driver::Mysql => &[
             "select", "with", "table", "values", "explain", "show", "describe", "desc",
         ],
+        Driver::Sqlite => &["select", "with", "values", "explain"],
     };
     if !allowed.contains(&first) {
         return Err(format!(

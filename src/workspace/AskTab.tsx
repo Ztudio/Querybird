@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { api, errorText, type AiAnswer, type AiStatus, type ChatGptStatus, type QueryResult } from "../api";
-import { Modal, mod } from "../components/ui";
-import { MANAGE_USAGE_URL, activeModel, getSettings, updateSettings, useSettings } from "../lib/settings";
+import { api, errorText, type AiAnswer, type AiStatus, type ChatGptStatus, type CodexModels, type QueryResult } from "../api";
+import { Modal } from "../components/ui";
+import { IconArrowUp, IconChevronDown, IconSparkle } from "../components/icons";
+import { CLAUDE_MODELS, MANAGE_USAGE_URL, activeModel, aiReady, autoPickLocalCli, getSettings, updateSettings, useSettings, type Settings } from "../lib/settings";
 import { ChatGptWelcome } from "../components/SettingsModal";
-import { isReadOnly } from "../lib/sql";
+import { isReadOnly, writeRisk } from "../lib/sql";
 import { DataGrid, type GridSelection } from "./DataGrid";
 import { useWs, type Details, type TabApi } from "./context";
 
@@ -19,6 +20,15 @@ interface Turn {
   result?: QueryResult;
   askMs?: number;
   runMs?: number;
+  /** Just arrived: reveal it progressively once. */
+  fresh?: boolean;
+}
+
+interface Source {
+  id: string;
+  label: string;
+  patch: Partial<Settings>;
+  available: boolean;
 }
 
 let turnSeq = 1;
@@ -45,7 +55,7 @@ export function AskTab({
   const [confirm, setConfirm] = useState<Turn | null>(null);
   const [context, setContext] = useState<Turn | null>(null);
   const [sel, setSel] = useState<GridSelection>({ rows: [], focus: null });
-  const [split, setSplit] = useState(0.5);
+  const [split, setSplit] = useState(0.6);
   const input = useRef<HTMLTextAreaElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const log = useRef<HTMLDivElement>(null);
@@ -59,41 +69,70 @@ export function AskTab({
     api.chatgptStatus().then(setGpt).catch(() => setGpt(null));
   };
   useEffect(() => {
-    refreshStatus();
+    // First time this tab opens: fall back to a local Claude Code / Codex if nothing else is set up.
+    Promise.all([api.aiStatus(), api.chatgptStatus().catch(() => null)])
+      .then(([st, g]) => {
+        setStatus(st);
+        setGpt(g);
+        autoPickLocalCli(st, g);
+      })
+      .catch(() => setStatus(null));
     input.current?.focus();
     const onFocus = () => refreshStatus();
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, []);
 
-  const ready =
-    !!status &&
-    (viaChatGpt
-      ? !!gpt?.signedIn && gpt.planUsage && !!model
-      : provider === "openai"
-        ? status.openaiKey
-        : settings.claudeAuth === "antCli"
-          ? status.antInstalled
-          : status.claudeKey);
-  const authLabel =
-    viaChatGpt
-      ? gpt?.signedIn
-        ? gpt.planUsage
-          ? `ChatGPT${gpt.email ? ` · ${gpt.email}` : ""}`
-          : "ChatGPT plan usage not granted"
-        : "not signed in with ChatGPT"
-      : provider === "openai"
-      ? status?.openaiKey
-        ? "OpenAI API key"
-        : "not set up"
-      : settings.claudeAuth === "antCli"
-        ? status?.antInstalled
-          ? "Signed in with Anthropic (ant CLI)"
-          : "ant CLI not installed"
-        : status?.claudeKey
-          ? "Anthropic API key"
-          : "not set up";
+  const ready = aiReady(settings, status, gpt);
+  const asking = turns.some((t) => t.status === "asking");
+  const [gptModels, setGptModels] = useState<{ id: string; label: string }[]>([]);
+  const [codex, setCodex] = useState<CodexModels | null>(null);
+  useEffect(() => {
+    if (settings.aiProvider === "openai" && settings.openaiAuth === "codex" && !codex) api.codexModels().then(setCodex).catch(() => {});
+  }, [settings.aiProvider, settings.openaiAuth]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (viaChatGpt && gpt?.signedIn && gpt.planUsage && !gptModels.length) api.chatgptModels().then(setGptModels).catch(() => {});
+  }, [viaChatGpt, gpt]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const sources: Source[] = [
+    { id: "claudeCode", label: "Claude Code", patch: { aiProvider: "claude", claudeAuth: "claudeCode" }, available: !!status?.claudeCodePath },
+    { id: "codex", label: "Codex", patch: { aiProvider: "openai", openaiAuth: "codex" }, available: !!status?.codexPath },
+    { id: "chatgpt", label: "ChatGPT", patch: { aiProvider: "openai", openaiAuth: "chatgpt" }, available: !!gpt?.signedIn && !!gpt.planUsage },
+    { id: "ant", label: "Claude (Anthropic sign-in)", patch: { aiProvider: "claude", claudeAuth: "antCli" }, available: !!status?.antInstalled },
+    { id: "claudeKey", label: "Claude API key", patch: { aiProvider: "claude", claudeAuth: "apiKey" }, available: !!status?.claudeKey },
+    { id: "openaiKey", label: "OpenAI API key", patch: { aiProvider: "openai", openaiAuth: "apiKey" }, available: !!status?.openaiKey },
+  ];
+  const source =
+    sources.find((x) => Object.entries(x.patch).every(([k, v]) => settings[k as keyof typeof settings] === v)) ?? sources[0];
+  const sourceLabel = source.label.replace(/ API key$| \(Anthropic sign-in\)$/, "");
+  const models = modelOptions(settings, gptModels, codex);
+  const setModel = (id: string) => {
+    if (provider === "claude") updateSettings({ claudeModel: id });
+    else if (settings.openaiAuth === "codex") updateSettings({ codexModel: id });
+    else if (settings.openaiAuth === "chatgpt") updateSettings({ chatgptModel: id });
+    else updateSettings({ openaiModel: id });
+  };
+
+  // Follow the conversation as it grows (streamed text, results), unless the reader scrolled up.
+  const stick = useRef(true);
+  useEffect(() => {
+    const el = log.current;
+    if (!el) return;
+    const onScroll = () => (stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48);
+    const follow = new MutationObserver(() => stick.current && (el.scrollTop = el.scrollHeight));
+    el.addEventListener("scroll", onScroll);
+    follow.observe(el, { childList: true, subtree: true, characterData: true });
+    return () => (el.removeEventListener("scroll", onScroll), follow.disconnect());
+  }, []);
+
+  // The composer grows with its text up to the CSS max-height, then scrolls.
+  // Measure only while the tab is on screen: a hidden tab reports a height of 0.
+  useEffect(() => {
+    const el = input.current;
+    if (!el || !active) return;
+    el.style.height = "auto";
+    if (el.scrollHeight > 0) el.style.height = `${el.scrollHeight}px`;
+  }, [question, active]);
   const update = (id: number, patch: Partial<Turn>) => setTurns((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
 
   /**
@@ -139,7 +178,7 @@ export function AskTab({
     setTurns((ts) => [...ts, turn]);
     setSelected(turn.id);
     if (!fixing) setQuestion("");
-    setTimeout(() => log.current && (log.current.scrollTop = log.current.scrollHeight), 0);
+    stick.current = true;
     const history = turns
       .filter((t) => t.answer?.sql)
       .slice(-6)
@@ -155,7 +194,7 @@ export function AskTab({
         question: text,
         history,
       });
-      const next: Turn = { ...turn, status: answer.sql ? "ready" : "done", answer, askMs: performance.now() - started };
+      const next: Turn = { ...turn, status: answer.sql ? "ready" : "done", answer, askMs: performance.now() - started, fresh: true };
       update(turn.id, next);
       const readOnly = answer.sql && !answer.modifiesData && isReadOnly(answer.sql);
       if (answer.sql && readOnly && s.aiAutoRun && !ws.safeMode) run(next);
@@ -199,122 +238,154 @@ export function AskTab({
   return (
     <div className="tab-body" ref={body}>
       <div className="ask-top" style={{ height: `${split * 100}%` }}>
-        <div className="ask-head">
-          <div className="segmented">
-            <button className={provider === "claude" ? "active" : ""} onClick={() => updateSettings({ aiProvider: "claude" })}>Claude</button>
-            <button className={provider === "openai" ? "active" : ""} onClick={() => updateSettings({ aiProvider: "openai" })}>OpenAI</button>
-          </div>
-          <span className="mono faint" style={{ fontSize: 11.5 }}>{model}</span>
-          <span className={`ask-auth${ready ? " ok" : ""}`} onClick={onOpenSettings} title="AI settings">
-            ● {authLabel}
-          </span>
-          {viaChatGpt && gpt?.planUsage && (
-            <span className="ask-plan">
-              Using ChatGPT plan · <a onClick={() => api.openHelpUrl(MANAGE_USAGE_URL)}>Manage usage</a>
-            </span>
-          )}
-          <span className="spacer" />
-          <label className="row faint" style={{ fontSize: 12 }} title="Read-only SQL runs right away; anything that changes data always asks first">
-            <input type="checkbox" checked={settings.aiAutoRun} onChange={(e) => updateSettings({ aiAutoRun: e.target.checked })} /> Auto-run read-only SQL
-          </label>
-          <button className="btn small" disabled={!turns.length} onClick={() => (setTurns([]), setSelected(null))}>Clear</button>
-        </div>
-
         <div className="ask-log" ref={log}>
           {!turns.length && (
             <div className="ask-empty">
+              <IconSparkle size={22} className="ask-empty-icon" />
               <div className="ask-empty-title">Ask your database in plain language</div>
               <div className="faint">
                 The AI writes the SQL, Querybird shows it to you, runs it, and displays the result. Only the schema
-                ({ws.objects.tables.length} tables, {ws.objects.views.length} views in <b>{ws.schema}</b>) is sent — never your data.
+                ({plural(ws.objects.tables.length, "table")}, {plural(ws.objects.views.length, "view")} in <b>{ws.schema}</b>) is sent — never your data.
               </div>
               <div className="ask-examples">
                 {["Top 10 customers by total order value", "How many orders per status this month?", "Products that are out of stock but still active"].map((ex) => (
-                  <button key={ex} className="btn small" onClick={() => setQuestion(ex)}>{ex}</button>
+                  <button key={ex} className="ask-example" onClick={() => (setQuestion(ex), input.current?.focus())}>
+                    <IconSparkle size={12} /> {ex}
+                  </button>
                 ))}
               </div>
             </div>
           )}
+          {turns.length > 0 && (
+            <div className="ask-log-head">
+              <button className="btn small" onClick={() => (setTurns([]), setSelected(null))}>New conversation</button>
+            </div>
+          )}
           {turns.map((t) => (
-            <div key={t.id} className={`ask-turn${t.id === selected ? " selected" : ""}`} onClick={() => setSelected(t.id)}>
-              <div className="ask-q">{t.question}</div>
-              {t.status === "asking" && <div className="faint">Writing SQL with {provider === "claude" ? "Claude" : viaChatGpt ? "ChatGPT" : "OpenAI"}…</div>}
-              {t.askError && (
-                <div className="ask-error">
-                  {t.askError}
-                  {t.askError.includes(MANAGE_USAGE_URL) && (
-                    <div style={{ marginTop: 6 }}>
-                      <button className="btn small primary" onClick={() => api.openHelpUrl(MANAGE_USAGE_URL)}>Manage usage</button>
-                    </div>
-                  )}
-                </div>
-              )}
-              {t.answer && (
-                <>
-                  {t.answer.explanation && <div className="ask-expl">{t.answer.explanation}</div>}
-                  {t.answer.sql ? (
-                    <pre className="mono ask-sql">{t.answer.sql};</pre>
-                  ) : (
-                    <div className="faint">No SQL was generated for this question.</div>
-                  )}
-                  {t.runError && (
-                    <div className="ask-error">
-                      {t.runError}
+            <div key={t.id} className="ask-turn" onClick={() => setSelected(t.id)}>
+              <div className="ask-bubble-row">
+                <div className="ask-bubble">{t.question}</div>
+              </div>
+              <div className={`ask-reply${t.id === selected ? " selected" : ""}`}>
+                {t.status === "asking" && <Thinking label={`Writing SQL with ${sourceLabel}`} />}
+                {t.askError && (
+                  <div className="ask-error">
+                    {t.askError}
+                    {t.askError.includes(MANAGE_USAGE_URL) && (
                       <div style={{ marginTop: 6 }}>
-                        <button
-                          className="btn small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // The (redacted) error travels in the history; the raw text, which can contain row values, isn't sent.
-                            ask(`The previous SQL failed when it ran. Please fix it. Original question: ${t.question}`, t);
-                          }}
-                        >
-                          Fix with AI
-                        </button>
+                        <button className="btn small primary" onClick={() => api.openHelpUrl(MANAGE_USAGE_URL)}>Manage usage</button>
                       </div>
-                    </div>
-                  )}
-                  <div className="ask-meta">
-                    <span className="faint">
-                      {t.answer.model} · {fmt(t.askMs)}
-                      {t.status === "running" ? " · running…" : ""}
-                      {t.result ? ` · ${t.result.columns.length ? `${t.result.rows.length.toLocaleString()} rows` : `${t.result.affected ?? 0} rows affected`} in ${fmt(t.runMs)}` : ""}
-                    </span>
-                    {(t.answer.modifiesData || (t.answer.sql && !isReadOnly(t.answer.sql))) && <span className="ask-badge">changes data</span>}
-                    <span className="spacer" />
-                    {t.answer.sql && (
-                      <>
-                        <button className="btn small" onClick={(e) => (e.stopPropagation(), run(t))}>{t.result || t.runError ? "Run again" : "Run"}</button>
-                        <button className="btn small" onClick={(e) => (e.stopPropagation(), ws.openQuery(`-- ${t.question.replace(/\n/g, " ")}\n${t.answer!.sql};\n`, "AI query"))}>Open in SQL Editor</button>
-                        <button className="btn small" onClick={(e) => (e.stopPropagation(), navigator.clipboard.writeText(t.answer!.sql))}>Copy SQL</button>
-                      </>
                     )}
-                    <button className="btn small" onClick={(e) => (e.stopPropagation(), setContext(t))}>What was sent</button>
                   </div>
-                </>
-              )}
+                )}
+                {t.answer && (
+                  <Answer
+                    turn={t}
+                    animate={!!t.fresh}
+                    onRevealed={() => update(t.id, { fresh: false })}
+                    footer={
+                      <>
+                        {t.runError && (
+                          <div className="ask-error">
+                            {t.runError}
+                            <div style={{ marginTop: 6 }}>
+                              <button
+                                className="btn small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // The (redacted) error travels in the history; the raw text, which can contain row values, isn't sent.
+                                  ask(`The previous SQL failed when it ran. Please fix it. Original question: ${t.question}`, t);
+                                }}
+                              >
+                                Fix with AI
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        <div className="ask-meta">
+                          <span className="faint">
+                            {t.answer.model} · {fmt(t.askMs)}
+                            {t.status === "running" ? " · running…" : ""}
+                            {t.result ? ` · ${t.result.columns.length ? `${t.result.rows.length.toLocaleString()} rows` : `${t.result.affected ?? 0} rows affected`} in ${fmt(t.runMs)}` : ""}
+                          </span>
+                          {(t.answer.modifiesData || (t.answer.sql && !isReadOnly(t.answer.sql))) && <span className="ask-badge">changes data</span>}
+                          <span className="spacer" />
+                          {t.answer.sql && (
+                            <>
+                              <button className="btn small" onClick={(e) => (e.stopPropagation(), run(t))}>{t.result || t.runError ? "Run again" : "Run"}</button>
+                              <button className="btn small" onClick={(e) => (e.stopPropagation(), ws.openQuery(`-- ${t.question.replace(/\n/g, " ")}\n${t.answer!.sql};\n`, "AI query"))}>Open in editor</button>
+                              <button className="btn small" onClick={(e) => (e.stopPropagation(), navigator.clipboard.writeText(t.answer!.sql), ws.toast("SQL copied"))}>Copy</button>
+                            </>
+                          )}
+                          <button className="btn small" onClick={(e) => (e.stopPropagation(), setContext(t))}>What was sent</button>
+                        </div>
+                      </>
+                    }
+                  />
+                )}
+              </div>
             </div>
           ))}
         </div>
 
-        <div className="ask-input">
-          <textarea
-            ref={input}
-            className="input"
-            rows={2}
-            value={question}
-            placeholder={ready ? `Ask about ${ws.schema}… e.g. “revenue per country, highest first”  (${mod}↵ to ask)` : "Set up Claude or OpenAI to start (click the status above)"}
-            onChange={(e) => setQuestion(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey || !e.shiftKey)) {
-                e.preventDefault();
-                ask();
-              }
-            }}
-          />
-          <button className="btn primary" disabled={!question.trim() || turns.some((t) => t.status === "asking")} onClick={() => ask()}>
-            {ready ? "Ask" : "Set up AI…"}
-          </button>
+        <div className="ask-composer-wrap">
+          <div className="ask-composer" onClick={() => input.current?.focus()}>
+            <textarea
+              ref={input}
+              rows={1}
+              value={question}
+              placeholder={ready ? `Ask about ${ws.schema}… e.g. “revenue per country, highest first”` : "Choose an AI source below to start"}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey || !e.shiftKey)) {
+                  e.preventDefault();
+                  ask();
+                }
+              }}
+            />
+            <div className="ask-tools" onClick={(e) => e.stopPropagation()}>
+              <PillSelect
+                title="Where the AI runs"
+                icon={<IconSparkle size={12} />}
+                value={source.id}
+                label={source.label}
+                warn={!ready}
+                options={[
+                  ...sources.map((x) => ({ value: x.id, label: x.available ? x.label : `${x.label} — not set up` })),
+                  { value: "__settings", label: "AI settings…" },
+                ]}
+                onChange={(v) => {
+                  if (v === "__settings") return onOpenSettings();
+                  const next = sources.find((x) => x.id === v)!;
+                  updateSettings(next.patch);
+                  if (!next.available) onOpenSettings();
+                }}
+              />
+              <PillSelect
+                title="Model"
+                value={model}
+                label={modelLabel(models, model)}
+                options={models.map((m) => ({ value: m.id, label: m.label }))}
+                onChange={setModel}
+              />
+              {viaChatGpt && gpt?.planUsage && (
+                <a className="ask-plan" onClick={() => api.openHelpUrl(MANAGE_USAGE_URL)}>Manage usage</a>
+              )}
+              <span className="spacer" />
+              <label className="ask-toggle" title="Read-only SQL runs right away; anything that changes data always asks first">
+                <input type="checkbox" checked={settings.aiAutoRun} onChange={(e) => updateSettings({ aiAutoRun: e.target.checked })} /> Auto-run
+              </label>
+              <button
+                className="btn primary ask-send"
+                title={ready ? `Ask (↵) · new line (⇧↵)` : "Set up an AI source"}
+                aria-label="Ask"
+                disabled={(!question.trim() && ready) || asking}
+                onClick={() => (ready ? ask() : onOpenSettings())}
+              >
+                <IconArrowUp />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -346,22 +417,13 @@ export function AskTab({
         />
       )}
       {confirm && (
-        <Modal
-          title="This statement changes data or structure — run it?"
-          width={620}
-          onClose={() => setConfirm(null)}
-          footer={
-            <>
-              <button className="btn" onClick={() => ws.openQuery(`${confirm.answer!.sql};\n`, "AI query")}>Open in SQL Editor instead</button>
-              <span className="spacer" />
-              <button className="btn" onClick={() => setConfirm(null)}>Cancel</button>
-              <button className="btn danger" onClick={() => run(confirm, true)}>Run</button>
-            </>
-          }
-        >
-          <div style={{ marginBottom: 8 }}>{confirm.answer?.explanation}</div>
-          <pre className="mono code-box">{confirm.answer?.sql};</pre>
-        </Modal>
+        <ConfirmWrite
+          turn={confirm}
+          sessionId={ws.sessionId}
+          onCancel={() => setConfirm(null)}
+          onRun={() => run(confirm, true)}
+          onOpenEditor={() => (setConfirm(null), ws.openQuery(`${confirm.answer!.sql};\n`, "AI query"))}
+        />
       )}
       {context?.answer && (
         <Modal title="What was sent to the AI" width={720} onClose={() => setContext(null)} footer={<><span className="spacer" /><button className="btn primary" onClick={() => setContext(null)}>Close</button></>}>
@@ -378,4 +440,215 @@ export function AskTab({
 function fmt(ms?: number) {
   if (ms == null) return "";
   return ms < 1000 ? `${ms.toFixed(0)} ms` : `${(ms / 1000).toFixed(1)} s`;
+}
+
+/** Models offered for the current source; the saved choice is always kept in the list. */
+function modelOptions(s: Settings, chatgpt: { id: string; label: string }[], codex: CodexModels | null): { id: string; label: string }[] {
+  let list: { id: string; label: string }[];
+  if (s.aiProvider === "claude") {
+    list = [
+      ...(s.claudeAuth === "claudeCode" ? [{ id: "", label: "Claude Code default" }] : []),
+      ...CLAUDE_MODELS.map((m) => ({ id: m.id, label: m.label.replace(/^Claude /, "") })),
+    ];
+  } else if (s.openaiAuth === "codex") {
+    // Whatever Codex itself offers right now; "default" follows its config.
+    const named = codex?.models.find((m) => m.id === codex.default)?.label ?? codex?.default;
+    list = [{ id: "", label: named ? `Codex default (${named})` : "Codex default" }, ...(codex?.models ?? []).map((m) => ({ id: m.id, label: m.label }))];
+  } else if (s.openaiAuth === "chatgpt") {
+    list = chatgpt.length ? chatgpt : [];
+  } else {
+    list = ["gpt-5", "gpt-5-mini", "gpt-4.1"].map((id) => ({ id, label: id }));
+  }
+  const current = activeModel(s);
+  if (!list.some((m) => m.id === current)) list = [{ id: current, label: current || "Default model" }, ...list];
+  return list;
+}
+
+/** Short label for the pill: "Opus 5.5" rather than "Opus 5.5 (default)". */
+function modelLabel(models: { id: string; label: string }[], id: string): string {
+  const m = models.find((x) => x.id === id);
+  return (m?.label ?? (id || "Default model")).replace(/\s*\(.*\)$/, "");
+}
+
+/** A compact pill that opens the native menu (a transparent <select> covers it). */
+function PillSelect({
+  title,
+  icon,
+  value,
+  label,
+  options,
+  onChange,
+  warn,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  value: string;
+  label: string;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
+  warn?: boolean;
+}) {
+  return (
+    <label className={`ask-pill${warn ? " warn" : ""}`} title={title}>
+      {icon}
+      <span className="ask-pill-text">{label}</span>
+      <IconChevronDown size={9} />
+      <select value={value} aria-label={title} onChange={(e) => onChange(e.target.value)}>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/** Waiting state: shimmering label (static under reduced motion) plus elapsed seconds as the static cue. */
+function Thinking({ label }: { label: string }) {
+  const [secs, setSecs] = useState(0);
+  useEffect(() => {
+    const started = Date.now();
+    const t = window.setInterval(() => setSecs(Math.floor((Date.now() - started) / 1000)), 250);
+    return () => window.clearInterval(t);
+  }, []);
+  return (
+    <div className="ask-thinking" role="status">
+      <span className="ask-shimmer">{label}…</span>
+      <span className="faint ask-secs">{secs}s</span>
+    </div>
+  );
+}
+
+const prefersReducedMotion = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** Reveals `text` progressively (about 1s at most), then calls `onDone`. */
+function useReveal(text: string, animate: boolean, onDone: () => void): number {
+  const [shown, setShown] = useState(animate && !prefersReducedMotion() ? 0 : text.length);
+  useEffect(() => {
+    if (shown >= text.length) {
+      if (animate) onDone();
+      return;
+    }
+    const total = Math.min(1000, Math.max(300, text.length * 6));
+    const started = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const n = Math.ceil(text.length * Math.min(1, (now - started) / total));
+      setShown(n);
+      if (n < text.length) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [text]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (animate && shown >= text.length) onDone();
+  }, [shown]); // eslint-disable-line react-hooks/exhaustive-deps
+  return shown;
+}
+
+/** The AI's reply: explanation, then SQL, revealed as one stream with a caret; actions appear once it's done. */
+function Answer({ turn, animate, onRevealed, footer }: { turn: Turn; animate: boolean; onRevealed: () => void; footer: React.ReactNode }) {
+  const a = turn.answer!;
+  const expl = a.explanation ?? "";
+  const sql = a.sql ? `${a.sql};` : "";
+  const shown = useReveal(expl + sql, animate, onRevealed);
+  const done = shown >= expl.length + sql.length;
+  const caret = !done && <span className="ask-caret" aria-hidden />;
+  return (
+    <>
+      {expl && (
+        <div className="ask-expl">
+          {expl.slice(0, shown)}
+          {shown <= expl.length && caret}
+        </div>
+      )}
+      {sql ? (
+        shown > expl.length && (
+          <pre className="mono ask-sql">
+            {sql.slice(0, shown - expl.length)}
+            {caret}
+          </pre>
+        )
+      ) : (
+        done && <div className="faint">No SQL was generated for this question.</div>
+      )}
+      {done && footer}
+    </>
+  );
+}
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+/**
+ * The only way AI-written SQL that changes data gets to run. Shows what it will touch first (a
+ * read-only COUNT for DELETE/UPDATE — the statement itself never runs early), and statements that
+ * can't be undone or hit every row need an explicit acknowledgement. Cancel has focus, so Enter
+ * never runs a write.
+ */
+function ConfirmWrite({ turn, sessionId, onCancel, onRun, onOpenEditor }: { turn: Turn; sessionId: string; onCancel: () => void; onRun: () => void; onOpenEditor: () => void }) {
+  const sql = turn.answer!.sql;
+  const risk = writeRisk(sql);
+  const [count, setCount] = useState<{ n?: string; error?: boolean } | null>(risk.countSql ? null : { error: true });
+  const [ack, setAck] = useState(false);
+  useEffect(() => {
+    if (!risk.countSql) return;
+    api
+      .executeReadonly(sessionId, risk.countSql)
+      .then(([r]) => setCount({ n: r?.rows[0]?.[0] ?? undefined }))
+      .catch(() => setCount({ error: true }));
+  }, [sql]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const verb = { delete: "delete", update: "change", insert: "insert", drop: "drop", truncate: "empty", alter: "alter", other: "change" }[risk.kind];
+  const rows = count?.n != null ? Number(count.n) : null;
+  const impact =
+    risk.kind === "drop"
+      ? `Permanently removes ${risk.target ?? "the object"} and everything in it.`
+      : risk.kind === "truncate"
+        ? `Deletes every row in ${risk.target ?? "the table"}.`
+        : risk.kind === "delete" || risk.kind === "update"
+          ? count === null
+            ? "Counting the rows it would " + verb + "…"
+            : rows != null
+              ? `Would ${verb} ${rows.toLocaleString()} row${rows === 1 ? "" : "s"}${risk.noWhere ? ` — every row in ${risk.target}` : ""}.`
+              : risk.noWhere
+                ? `Has no WHERE clause, so it ${verb}s every row in ${risk.target ?? "the table"}.`
+                : "Couldn't count the affected rows in advance — check the WHERE clause carefully."
+          : risk.kind === "alter"
+            ? "Changes the table’s structure."
+            : "Changes data or structure.";
+  const needsAck = risk.destructive || (rows != null && rows > 1000);
+  const title = risk.destructive ? "Destructive statement — review before running" : "This statement changes data — run it?";
+
+  return (
+    <Modal
+      title={title}
+      width={640}
+      onClose={onCancel}
+      footer={
+        <>
+          <button className="btn" onClick={onOpenEditor}>Open in SQL Editor instead</button>
+          <span className="spacer" />
+          <button className="btn" autoFocus onClick={onCancel}>Cancel</button>
+          <button className="btn danger" disabled={(needsAck && !ack) || (count === null && !!risk.countSql)} onClick={onRun}>
+            {risk.kind === "delete" && rows != null ? `Delete ${rows.toLocaleString()} row${rows === 1 ? "" : "s"}` : "Run"}
+          </button>
+        </>
+      }
+    >
+      <div className="confirm-write">
+        {turn.answer!.explanation && <div>{turn.answer!.explanation}</div>}
+        <div className={`confirm-impact${risk.destructive || (rows ?? 0) > 1000 ? " danger" : ""}`} role="status">
+          {impact}
+        </div>
+        <pre className="mono code-box">{sql};</pre>
+        {needsAck && (
+          <label className="row confirm-ack">
+            <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
+            {risk.kind === "drop" || risk.kind === "truncate" || risk.kind === "alter"
+              ? "I understand this can’t be undone."
+              : `I understand this ${verb}s ${rows != null ? rows.toLocaleString() : "every"} row${rows === 1 ? "" : "s"} and can’t be undone without a backup.`}
+          </label>
+        )}
+      </div>
+    </Modal>
+  );
 }

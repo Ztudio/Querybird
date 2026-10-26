@@ -65,6 +65,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
                 "New Connection…",
                 Some("CmdOrCtrl+N"),
             )?,
+            &item(app, "new_user", "New Database User…", None)?,
             &item(app, "open_sql", "Open SQL File…", Some("CmdOrCtrl+O"))?,
             &item(app, "new_query", "New SQL Query", Some("CmdOrCtrl+T"))?,
             &sep()?,

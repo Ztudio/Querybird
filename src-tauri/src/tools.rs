@@ -229,9 +229,13 @@ pub async fn backup(
     custom_format: bool,
     tools_dir: Option<&str>,
 ) -> Result<String, String> {
+    if cfg.driver == Driver::Sqlite {
+        return sqlite_job(cfg, path, crate::db::sqlite::backup).await;
+    }
     check_database(database)?;
     let (target, _tunnel) = via_tunnel(cfg).await?;
     match cfg.driver {
+        Driver::Sqlite => unreachable!(),
         Driver::Postgres => {
             let tool = find_tool("pg_dump", tools_dir).ok_or_else(|| missing("pg_dump"))?;
             let mut cmd = Command::new(tool);
@@ -276,6 +280,9 @@ pub async fn restore(
     path: &str,
     tools_dir: Option<&str>,
 ) -> Result<String, String> {
+    if cfg.driver == Driver::Sqlite {
+        return sqlite_job(cfg, path, crate::db::sqlite::restore).await;
+    }
     check_database(database)?;
     let (target, _tunnel) = via_tunnel(cfg).await?;
     let is_sql = path.to_lowercase().ends_with(".sql");
@@ -315,7 +322,20 @@ pub async fn restore(
             cmd.arg("--").arg(database);
             run(cmd, Some(Path::new(path))).await
         }
+        Driver::Sqlite => unreachable!(),
     }
+}
+
+/// SQLite needs no external tools: backup and restore run in-process off the async runtime.
+async fn sqlite_job(
+    cfg: &ConnectionConfig,
+    path: &str,
+    job: fn(&ConnectionConfig, &str) -> Result<String, String>,
+) -> Result<String, String> {
+    let (cfg, path) = (cfg.clone(), path.to_string());
+    tokio::task::spawn_blocking(move || job(&cfg, &path))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[cfg(test)]

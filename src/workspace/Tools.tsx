@@ -112,7 +112,7 @@ export function ExportDialog({ preselect, onClose }: { preselect: string[]; onCl
           <span className="faint" style={{ fontSize: 12 }}>{busy ?? `${tables.length} selected`}</span>
           <span className="spacer" />
           <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn primary" disabled={!tables.length || !!busy} onClick={run}>Export...</button>
+          <button className="btn primary" disabled={!tables.length || !!busy} onClick={run}>Export…</button>
         </>
       }
     >
@@ -310,7 +310,7 @@ export function ImportSqlDialog({ onClose }: { onClose: () => void }) {
   const ws = useWs();
   const [path, setPath] = useState<string | null>(null);
   const [statements, setStatements] = useState<string[]>([]);
-  const [transaction, setTransaction] = useState(ws.driver === "postgres");
+  const [transaction, setTransaction] = useState(ws.driver !== "mysql");
   const [busy, setBusy] = useState(false);
 
   const pick = async () => {
