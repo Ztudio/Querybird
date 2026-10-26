@@ -55,7 +55,7 @@ export function OpenAnything({ saved, onClose }: { saved: SavedQuery[]; onClose:
           className="input"
           autoFocus
           style={{ height: 32, fontSize: 15 }}
-          placeholder="Open table, view or saved query..."
+          placeholder="Open table, view or saved query…"
           value={q}
           onChange={(e) => {
             setQ(e.target.value);

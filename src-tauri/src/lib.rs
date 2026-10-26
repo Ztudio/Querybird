@@ -1,6 +1,7 @@
 pub mod ai;
 mod chatgpt;
 pub mod db;
+mod local_cli;
 mod menu;
 mod secure;
 mod store;
@@ -261,8 +262,59 @@ async fn table_ddl(
 async fn process_list_sql(state: State<'_, AppState>, session_id: String) -> Res<String> {
     Ok(session(&state, &session_id)
         .await?
-        .process_list_sql()
+        .process_list_sql()?
         .to_string())
+}
+
+#[tauri::command]
+async fn list_users(state: State<'_, AppState>, session_id: String) -> Res<Vec<db::users::DbUser>> {
+    session(&state, &session_id).await?.list_users().await
+}
+
+#[tauri::command]
+async fn user_grants(
+    state: State<'_, AppState>,
+    session_id: String,
+    name: String,
+    host: String,
+) -> Res<Vec<String>> {
+    session(&state, &session_id)
+        .await?
+        .user_grants(&name, &host)
+        .await
+}
+
+#[tauri::command]
+async fn user_preview(
+    state: State<'_, AppState>,
+    session_id: String,
+    action: db::users::UserAction,
+) -> Res<Vec<String>> {
+    session(&state, &session_id)
+        .await?
+        .user_preview(&action)
+        .await
+}
+
+#[tauri::command]
+async fn user_apply(
+    state: State<'_, AppState>,
+    session_id: String,
+    action: db::users::UserAction,
+) -> Res<Vec<String>> {
+    session(&state, &session_id)
+        .await?
+        .user_apply(&action)
+        .await
+}
+
+/// Creates an empty SQLite database at a path the user picked in a save dialog.
+#[tauri::command]
+async fn create_sqlite_file(state: State<'_, AppState>, path: String) -> Res<()> {
+    let path = state.picked.check(&path)?;
+    tauri::async_runtime::spawn_blocking(move || db::sqlite::create(&path))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -407,6 +459,14 @@ async fn ai_status() -> Res<ai::AiStatus> {
     tauri::async_runtime::spawn_blocking(ai::status)
         .await
         .map_err(|e| e.to_string())
+}
+
+/// Models the local Codex CLI offers (its own cached list).
+#[tauri::command]
+async fn codex_models() -> local_cli::CodexModels {
+    tauri::async_runtime::spawn_blocking(local_cli::codex_models)
+        .await
+        .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -594,6 +654,11 @@ pub fn run() {
             table_info,
             table_ddl,
             process_list_sql,
+            list_users,
+            user_grants,
+            user_preview,
+            user_apply,
+            create_sqlite_file,
             execute,
             preview_changes,
             apply_changes,
@@ -607,6 +672,7 @@ pub fn run() {
             restore_database,
             ai_status,
             ai_set_key,
+            codex_models,
             ai_clear_key,
             ai_ant_login,
             ai_ask,

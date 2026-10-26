@@ -92,7 +92,7 @@ export function Sidebar({
     submenu: [
       { label: "Table", onClick: () => ws.openQuery(createTableTemplate(ws.driver, ws.schema), "New table") },
       { label: "View", onClick: () => ws.openQuery(createViewTemplate(ws.driver, ws.schema), "New view") },
-      { label: "Function / Procedure", onClick: () => ws.openQuery(createFunctionTemplate(ws.driver, ws.schema), "New function") },
+      ...(ws.driver !== "sqlite" ? [{ label: "Function / Procedure", onClick: () => ws.openQuery(createFunctionTemplate(ws.driver, ws.schema), "New function") }] : []),
       ...(ws.driver === "postgres" ? [{ label: "Materialized View", onClick: () => ws.openQuery(createViewTemplate(ws.driver, ws.schema, true), "New materialized view") }] : []),
     ],
   });
@@ -119,12 +119,12 @@ export function Sidebar({
         { label: "Copy name", onClick: () => copy(name) },
         { label: pins.includes(name) ? "Unpin" : "Pin to top", onClick: () => togglePin(name) },
         { separator: true },
-        { label: "Export", submenu: [{ label: "Export...", onClick: () => onExport([name]) }] },
+        { label: "Export", submenu: [{ label: "Export…", onClick: () => onExport([name]) }] },
         {
           label: "Import",
           submenu: [
-            { label: "From CSV...", disabled: !isTable, onClick: () => onImportCsv(name) },
-            { label: "From SQL Dump...", onClick: onImportSql },
+            { label: "From CSV…", disabled: !isTable, onClick: () => onImportCsv(name) },
+            { label: "From SQL Dump…", onClick: onImportSql },
           ],
         },
         { separator: true },
@@ -141,9 +141,9 @@ export function Sidebar({
         },
         { label: "Query in new tab", onClick: () => ws.openQuery(`SELECT * FROM ${full} LIMIT 100;`, name, true) },
         { separator: true },
-        { label: "Clone...", disabled: !isTable, onClick: () => setClone({ table: name, name: `${name}_copy`, withData: true }) },
-        { label: "Truncate...", kbd: `⌥${mod}⌫`, danger: true, disabled: !isTable, onClick: () => runDanger(`Truncate ${name}?`, `TRUNCATE TABLE ${full};`) },
-        { label: "Delete...", kbd: `${mod}⌫`, danger: true, onClick: () => runDanger(`Drop ${isTable ? "table" : "view"} ${name}?`, `DROP ${isTable ? "TABLE" : "VIEW"} ${full};`) },
+        { label: "Clone…", disabled: !isTable, onClick: () => setClone({ table: name, name: `${name}_copy`, withData: true }) },
+        { label: "Truncate…", kbd: `⌥${mod}⌫`, danger: true, disabled: !isTable, onClick: () => runDanger(`Truncate ${name}?`, `TRUNCATE TABLE ${full};`) },
+        { label: "Delete…", kbd: `${mod}⌫`, danger: true, onClick: () => runDanger(`Drop ${isTable ? "table" : "view"} ${name}?`, `DROP ${isTable ? "TABLE" : "VIEW"} ${full};`) },
       ],
     });
   };
@@ -162,7 +162,7 @@ export function Sidebar({
       <div style={{ padding: "4px 8px 6px" }}>
         <div className="search">
           <IconSearch />
-          <input className="input" placeholder={mode === "items" ? "Search for item..." : mode === "queries" ? "Search saved queries..." : "Search history..."} value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="input" placeholder={mode === "items" ? "Search for item…" : mode === "queries" ? "Search saved queries…" : "Search history…"} value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
       </div>
 
@@ -296,7 +296,7 @@ export function Sidebar({
                   const st = cloneTableStatements(ws.driver, ws.schema, clone.table, clone.name.trim(), clone.withData);
                   setClone(null);
                   try {
-                    await api.runStatements(ws.sessionId, st, ws.driver === "postgres");
+                    await api.runStatements(ws.sessionId, st, ws.driver !== "mysql");
                     st.forEach(ws.log);
                     ws.toast(`Cloned ${clone.table} → ${clone.name}`);
                     onRefresh();

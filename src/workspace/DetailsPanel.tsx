@@ -19,7 +19,7 @@ export function DetailsPanel({ details }: { details: Details | null }) {
       <div style={{ padding: "6px 10px" }}>
         <div className="search">
           <IconSearch />
-          <input className="input" placeholder="Search for field..." value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="input" placeholder="Search for field…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
       </div>
       <div className="details-body">

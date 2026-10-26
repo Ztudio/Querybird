@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitStatements, statementAt, withLimit, isReadOnly } from "./sql";
+import { splitStatements, statementAt, withLimit, isReadOnly, writeRisk } from "./sql";
 import { buildChanges, displayRows, editCount, emptyEdits, setCell, toggleDelete } from "./edits";
 import { toCsv, toInsertSql, toJson } from "./export";
 
@@ -160,6 +160,22 @@ describe("structure ddl", () => {
       "CREATE UNIQUE INDEX `idx_status` ON `shop`.`orders` (`status`);",
     ]);
   });
+  it("sqlite: rename and add/drop only; index names are schema-qualified", () => {
+    const a = draftFromColumn(col("status", "text"));
+    a.name = "state";
+    a.dataType = "integer";
+    const added = { original: null, name: "note", dataType: "text", nullable: true, default: null, comment: "ignored", dropped: false };
+    const idx = { original: null, name: "ix_state", columns: "state", unique: true, dropped: false };
+    const old = draftFromIndex({ name: "ix_old", algorithm: "BTREE", unique: false, primary: false, columns: "x", condition: null });
+    old.dropped = true;
+    expect(structureStatements("sqlite", "main", "t", [a, added], [idx, old])).toEqual([
+      'ALTER TABLE "main"."t" RENAME COLUMN "status" TO "state";',
+      'ALTER TABLE "main"."t" ADD COLUMN "note" text NULL;',
+      'CREATE UNIQUE INDEX "main"."ix_state" ON "t" ("state");',
+      'DROP INDEX "main"."ix_old";',
+    ]);
+    expect(cloneTableStatements("sqlite", "main", "t", "t2", false)).toEqual(['CREATE TABLE "main"."t2" AS SELECT * FROM "main"."t" WHERE 0;']);
+  });
   it("unchanged drafts produce nothing", () => {
     expect(structureStatements("postgres", "s", "t", [draftFromColumn(col("a", "int"))], [])).toEqual([]);
   });
@@ -182,5 +198,29 @@ describe("more export + DEFAULT", () => {
     const ch = buildChanges("public", "t", cols, [["1", "a"]], ["id"], e);
     expect(ch[0].values).toEqual([{ column: "name", value: null, default: true }]);
     expect(ch[1].values).toEqual([{ column: "name", value: "x" }]);
+  });
+});
+
+describe("writeRisk", () => {
+  it("counts the rows a DELETE/UPDATE would touch, without running it", () => {
+    const d = writeRisk("DELETE FROM orders WHERE status = 'cancelled' AND note <> 'where (x)';");
+    expect(d).toMatchObject({ kind: "delete", destructive: false, noWhere: false, target: "orders" });
+    expect(d.countSql).toBe("SELECT COUNT(*) FROM orders WHERE status = 'cancelled' AND note <> 'where (x)'");
+    const u = writeRisk('UPDATE "public"."customers" c SET name = upper(name) WHERE c.id IN (SELECT id FROM x WHERE y)');
+    expect(u.countSql).toBe('SELECT COUNT(*) FROM "public"."customers" c WHERE c.id IN (SELECT id FROM x WHERE y)');
+  });
+  it("flags statements that hit every row or can't be undone", () => {
+    expect(writeRisk("DELETE FROM orders")).toMatchObject({ destructive: true, noWhere: true, countSql: "SELECT COUNT(*) FROM orders" });
+    expect(writeRisk("UPDATE t SET a = 1")).toMatchObject({ destructive: true, noWhere: true });
+    expect(writeRisk("DROP TABLE IF EXISTS orders")).toMatchObject({ kind: "drop", destructive: true, target: "orders" });
+    expect(writeRisk("TRUNCATE TABLE orders")).toMatchObject({ kind: "truncate", destructive: true });
+    expect(writeRisk("ALTER TABLE t DROP COLUMN a").destructive).toBe(true);
+    expect(writeRisk("INSERT INTO t (a) VALUES (1); DELETE FROM t").destructive).toBe(true);
+  });
+  it("doesn't guess a count for forms it can't rewrite safely", () => {
+    expect(writeRisk("DELETE FROM a USING b WHERE a.id = b.id").countSql).toBeNull();
+    expect(writeRisk("UPDATE a SET x = b.x FROM b WHERE a.id = b.id").countSql).toBeNull();
+    expect(writeRisk("DELETE FROM t WHERE a = 1 LIMIT 5").countSql).toBeNull();
+    expect(writeRisk("INSERT INTO t VALUES (1)")).toMatchObject({ kind: "insert", destructive: false, countSql: null });
   });
 });

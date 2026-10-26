@@ -2,17 +2,23 @@ import { useState } from "react";
 import { api, errorText, type ConnectionConfig, type Driver, type SshConfig } from "../api";
 import { DRIVERS, Modal, STATUS_COLORS, TAGS } from "../components/ui";
 
+export const SQLITE_EXTENSIONS = ["sqlite", "sqlite3", "db", "db3", "s3db"];
+
+/** File name without folders or extension, used to name SQLite connections. */
+export const fileStem = (path: string) => (path.split(/[\\/]/).pop() ?? path).replace(/\.[^.]+$/, "");
+
 export function newConfig(driver: Driver, group = ""): ConnectionConfig {
   const d = DRIVERS.find((x) => x.id === driver)!;
+  const file = driver === "sqlite";
   return {
     id: "",
     name: "",
     driver,
-    host: "127.0.0.1",
+    host: file ? "" : "127.0.0.1",
     port: d.port,
     user: "",
     database: "",
-    sslMode: "prefer",
+    sslMode: file ? "disable" : "prefer",
     passwordMode: "keychain",
     color: "",
     tag: "local",
@@ -24,10 +30,22 @@ export function newConfig(driver: Driver, group = ""): ConnectionConfig {
 
 const emptySsh = (): SshConfig => ({ enabled: true, host: "", port: 22, user: "", keyPath: null, hostKey: null });
 
-/** Parses postgres://user:pass@host:port/db and mysql://… URLs. */
+/** Parses postgres://user:pass@host:port/db, mysql://… and sqlite:///path URLs (or a bare SQLite file path). */
 export function parseUrl(url: string): { config: ConnectionConfig; password: string } | null {
+  const raw = url.trim();
+  const sqlitePath = /^sqlite3?:\/\//i.test(raw)
+    ? decodeURIComponent(raw.replace(/^sqlite3?:\/\//i, ""))
+    : /^(\/|~|[a-z]:\\)/i.test(raw) && new RegExp(`\\.(${SQLITE_EXTENSIONS.join("|")})$`, "i").test(raw)
+      ? raw
+      : null;
+  if (sqlitePath) {
+    const c = newConfig("sqlite");
+    c.database = sqlitePath;
+    c.name = fileStem(sqlitePath);
+    return { config: c, password: "" };
+  }
   try {
-    const u = new URL(url.trim());
+    const u = new URL(raw);
     const scheme = u.protocol.replace(":", "");
     const driver: Driver | null = /^postgres(ql)?$/.test(scheme) ? "postgres" : /^(mysql|mariadb)$/.test(scheme) ? "mysql" : null;
     if (!driver) return null;
@@ -47,6 +65,7 @@ export function parseUrl(url: string): { config: ConnectionConfig; password: str
 
 /** Inverse of parseUrl, for "Copy as URL". */
 export function toUrl(c: ConnectionConfig, password?: string | null): string {
+  if (c.driver === "sqlite") return `sqlite://${c.database}`;
   const scheme = c.driver === "postgres" ? "postgresql" : "mysql";
   const auth = c.user ? `${encodeURIComponent(c.user)}${password ? `:${encodeURIComponent(password)}` : ""}@` : "";
   const ssl = c.sslMode === "prefer" ? "" : c.driver === "postgres" ? `?sslmode=${c.sslMode}` : `?ssl-mode=${c.sslMode === "require" ? "REQUIRED" : "DISABLED"}`;
@@ -82,9 +101,26 @@ export function ConnectionForm({
   const ssh = c.ssh?.enabled ? c.ssh : null;
   const setSsh = (patch: Partial<SshConfig>) => setC((p) => ({ ...p, ssh: { ...(p.ssh ?? emptySsh()), ...patch } }));
   const pw = pwTouched ? password : null;
+  const isFile = c.driver === "sqlite";
+
+  const browseFile = async () => {
+    const p = await api.pickPath("open", { filterName: "SQLite database", extensions: SQLITE_EXTENSIONS });
+    if (p) setC((x) => ({ ...x, database: p, name: x.name || fileStem(p) }));
+  };
+  const newFile = async () => {
+    const p = await api.pickPath("save", { defaultName: `${c.name.trim() || "database"}.sqlite`, filterName: "SQLite database", extensions: SQLITE_EXTENSIONS });
+    if (!p) return;
+    try {
+      await api.createSqliteFile(p);
+      setC((x) => ({ ...x, database: p, name: x.name || fileStem(p) }));
+      setStatus({ ok: true, text: `Created ${p}` });
+    } catch (e) {
+      setStatus({ ok: false, text: errorText(e) });
+    }
+  };
 
   const finalConfig = (): ConnectionConfig => {
-    const out = { ...c, name: c.name.trim() || c.database || c.host || driver.label };
+    const out = { ...c, name: c.name.trim() || (isFile && c.database ? fileStem(c.database) : c.database || c.host || driver.label) };
     if (out.ssh) {
       out.ssh = { ...out.ssh, keyPath: useKey ? out.ssh.keyPath : null };
       if (sshPwTouched) out.ssh.password = sshPassword;
@@ -108,7 +144,7 @@ export function ConnectionForm({
     setStatus(null);
     try {
       const v = await api.testConnection(finalConfig(), pw);
-      setStatus({ ok: true, text: `Connection is OK — ${driver.label} ${v}${ssh ? " (over SSH)" : ""}` });
+      setStatus({ ok: true, text: `Connection is OK — ${driver.label} ${v}${ssh && !isFile ? " (over SSH)" : ""}` });
     } catch (e) {
       setStatus({ ok: false, text: errorText(e) });
     } finally {
@@ -168,7 +204,29 @@ export function ConnectionForm({
             </select>
           </div>,
         )}
-        {field(
+        {isFile && (
+          <>
+            {field(
+              "Database file",
+              <div className="row">
+                <input className="input mono" style={{ flex: 1 }} value={c.database} placeholder="~/data/app.sqlite" onChange={(e) => set("database", e.target.value)} />
+                <button type="button" className="btn" onClick={browseFile}>Open…</button>
+                <button type="button" className="btn" onClick={newFile} title="Create a new, empty database file">New…</button>
+              </div>,
+            )}
+            {field(
+              "Group",
+              <div className="row">
+                <input className="input" style={{ flex: 1 }} list="rb-groups" value={c.group} placeholder="none" onChange={(e) => set("group", e.target.value)} />
+                <datalist id="rb-groups">{groups.map((g) => <option key={g} value={g} />)}</datalist>
+                <button type="button" className={`btn${c.bootstrap.trim() ? " on" : ""}`} onClick={() => setBootstrapOpen(true)}>
+                  Bootstrap commands…
+                </button>
+              </div>,
+            )}
+          </>
+        )}
+        {!isFile && field(
           "Host",
           <div className="row">
             <input className="input" style={{ flex: 1 }} value={c.host} placeholder="127.0.0.1" onChange={(e) => set("host", e.target.value)} />
@@ -182,7 +240,7 @@ export function ConnectionForm({
             />
           </div>,
         )}
-        {field(
+        {!isFile && field(
           "User",
           <div className="row">
             <input className="input" style={{ flex: 1 }} value={c.user} placeholder={driver.user} onChange={(e) => set("user", e.target.value)} />
@@ -191,7 +249,7 @@ export function ConnectionForm({
             <datalist id="rb-groups">{groups.map((g) => <option key={g} value={g} />)}</datalist>
           </div>,
         )}
-        {field(
+        {!isFile && field(
           "Password",
           <div className="row">
             <input
@@ -212,16 +270,16 @@ export function ConnectionForm({
             </select>
           </div>,
         )}
-        {field(
+        {!isFile && field(
           "Database",
           <div className="row">
             <input className="input" style={{ flex: 1 }} value={c.database} placeholder="database name" onChange={(e) => set("database", e.target.value)} />
             <button type="button" className={`btn${c.bootstrap.trim() ? " on" : ""}`} onClick={() => setBootstrapOpen(true)}>
-              Bootstrap commands...
+              Bootstrap commands…
             </button>
           </div>,
         )}
-        {field(
+        {!isFile && field(
           "SSL mode",
           <select className="input" value={c.sslMode} onChange={(e) => set("sslMode", e.target.value as ConnectionConfig["sslMode"])}>
             <option value="disable">DISABLE</option>
@@ -231,7 +289,7 @@ export function ConnectionForm({
           </select>,
         )}
 
-        {ssh && (
+        {ssh && !isFile && (
           <>
             <div className="form-section">SSH tunnel</div>
             {field(
@@ -294,14 +352,14 @@ export function ConnectionForm({
           {busy ? <span className="muted">Testing…</span> : status?.text}
         </div>
         <div style={{ gridColumn: "1 / 3", display: "flex", gap: 8 }}>
-          <button
+          {!isFile && <button
             type="button"
             className={`btn${ssh ? " on" : ""}`}
             style={{ width: 90 }}
             onClick={() => setC((p) => ({ ...p, ssh: p.ssh?.enabled ? { ...p.ssh, enabled: false } : { ...(p.ssh ?? emptySsh()), enabled: true } }))}
           >
             Over SSH
-          </button>
+          </button>}
           <button type="button" className="btn" style={{ width: 80 }} onClick={onClose}>Cancel</button>
           <span className="spacer" />
           <button type="button" className="btn" style={{ width: 80 }} onClick={async () => (await save()) && onClose()}>Save</button>
@@ -329,7 +387,13 @@ export function ConnectionForm({
             spellCheck={false}
             value={c.bootstrap}
             onChange={(e) => set("bootstrap", e.target.value)}
-            placeholder={c.driver === "postgres" ? "SET search_path TO app, public;\nSET statement_timeout = '30s';" : "SET SESSION sql_mode = 'STRICT_ALL_TABLES';"}
+            placeholder={
+              c.driver === "postgres"
+                ? "SET search_path TO app, public;\nSET statement_timeout = '30s';"
+                : c.driver === "sqlite"
+                  ? "PRAGMA journal_mode = WAL;\nATTACH DATABASE '/path/other.db' AS other;"
+                  : "SET SESSION sql_mode = 'STRICT_ALL_TABLES';"
+            }
             style={{ width: "100%", height: 180, padding: 8 }}
           />
         </Modal>

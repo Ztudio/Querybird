@@ -18,7 +18,9 @@ Legend: ✅ built & verified (automated test and/or clicked through in the app) 
 | Connect over SSH — password or private key, host-key pinning | ✅ live-tested (tunnel to PG & MySQL, bad password, changed host key) · 🔶 form UI |
 | Bootstrap commands (SQL run after connect) | ✅ live-tested · 🔶 form UI |
 | Backup database / Restore database (pg_dump, pg_restore, psql, mysqldump, mysql) | ✅ live round-trip on both DBs · 🔶 dialog UI |
-| Other drivers (SQLite, Redis, Mongo, …) | ➖ scope is Postgres + MySQL |
+| SQLite | ✅ unit + session tests · 🔶 UI click-through pending |
+| User management (create / alter / drop, access presets, role membership) | ✅ live-tested on PG 17 & MySQL 9.7 · 🔶 UI click-through pending |
+| Other drivers (Redis, Mongo, …) | ➖ scope is Postgres + MySQL + SQLite |
 
 ## Workspace & navigation
 | TablePlus feature | Querybird |

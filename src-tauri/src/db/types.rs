@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 pub enum Driver {
     Postgres,
     Mysql,
+    Sqlite,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug, Default)]

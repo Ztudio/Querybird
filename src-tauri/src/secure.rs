@@ -167,6 +167,7 @@ pub fn connection_url(store: &Store, id: &str, with_password: bool) -> Result<St
     let scheme = match c.driver {
         crate::db::types::Driver::Postgres => "postgresql",
         crate::db::types::Driver::Mysql => "mysql",
+        crate::db::types::Driver::Sqlite => return Ok(format!("sqlite://{}", c.database)),
     };
     let auth = if c.user.is_empty() {
         String::new()

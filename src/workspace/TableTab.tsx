@@ -366,8 +366,8 @@ export function TableTab({
             { label: `${col.name} IS NOT NULL`, onClick: () => quickFilter(col.name, "IS NOT NULL", "") },
           ],
         },
-        { label: "Import", submenu: [{ label: "From CSV...", disabled: isView, onClick: () => onImportCsv(table) }] },
-        { label: "Export current page...", onClick: exportPage },
+        { label: "Import", submenu: [{ label: "From CSV…", disabled: isView, onClick: () => onImportCsv(table) }] },
+        { label: "Export current page…", onClick: exportPage },
         { separator: true },
         { label: sel.rows.length > 1 ? `Delete ${sel.rows.length} Rows` : "Delete", kbd: `${mod}⌫`, danger: true, disabled: !editable, onClick: () => setEdits((ed) => toggleDelete(ed, sel.rows, baseRows.length)) },
       ],
@@ -516,7 +516,7 @@ export function TableTab({
               {structure ? `${structure.columns.length} columns · ${structure.indexes.length} indexes` : ""}
             </span>
             <span className="spacer" />
-            <button className="btn" onClick={() => onExport([table])}>Export...</button>
+            <button className="btn" onClick={() => onExport([table])}>Export…</button>
           </>
         )}
       </div>

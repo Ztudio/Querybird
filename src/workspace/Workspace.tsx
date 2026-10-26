@@ -3,14 +3,14 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import { api, errorText, type Filter, type ObjectList, type SessionInfo } from "../api";
 import {
-  IconClose, IconDatabase, IconEye, IconList, IconLock, IconPlug, IconRefresh, IconSearch,
+  IconClose, IconDatabase, IconEye, IconList, IconUsers, IconLock, IconPlug, IconRefresh, IconSearch,
   IconMore, IconSparkle, IconSidebarBottom, IconSidebarLeft, IconSidebarRight, IconTrash, IconUnlock, IconX,
 } from "../components/icons";
 import { ContextMenu, DRIVERS, Modal, isMac, load, mod, save, tagColor, useToast, type MenuState } from "../components/ui";
 import { BackupDialog } from "../components/BackupDialog";
 import { SettingsModal } from "../components/SettingsModal";
 import { getSettings, updateSettings } from "../lib/settings";
-import { OverviewTab, ProcessTab, usersSql } from "./AdminTabs";
+import { OverviewTab, ProcessTab, UsersTab } from "./AdminTabs";
 import { AskTab } from "./AskTab";
 import { ExportDialog, ImportCsvDialog, ImportSqlDialog, SearchDialog } from "./Tools";
 import { DetailsPanel } from "./DetailsPanel";
@@ -26,7 +26,8 @@ type Tab =
   | { id: string; kind: "query"; title: string; sql: string; run?: boolean }
   | { id: string; kind: "ai"; title: string }
   | { id: string; kind: "overview"; title: string }
-  | { id: string; kind: "processes"; title: string };
+  | { id: string; kind: "processes"; title: string }
+  | { id: string; kind: "users"; title: string };
 
 type Dialog =
   | { kind: "settings"; tab?: "general" | "editor" | "data" | "tools" | "ai" }
@@ -41,7 +42,7 @@ type Dialog =
 type SavedTab =
   | { kind: "table"; schema: string; table: string; view?: "data" | "structure" }
   | { kind: "query"; title: string; sql: string }
-  | { kind: "overview" | "processes" | "ai" };
+  | { kind: "overview" | "processes" | "ai" | "users" };
 
 interface LogEntry {
   at: Date;
@@ -136,13 +137,27 @@ export function Workspace({ sessionId }: { sessionId: string }) {
       }
       if (t.kind === "query") return [{ id: newId(), kind: "query", title: t.title, sql: t.sql }];
       if (t.kind === "ai") return [{ id: newId(), kind: "ai", title: "Ask AI" }];
+      if (t.kind === "users") return [{ id: newId(), kind: "users", title: "Users" }];
       return [t.kind === "overview" ? { id: newId(), kind: "overview", title: "Item overview" } : { id: newId(), kind: "processes", title: "Processes" }];
     });
     if (next.length) {
       setTabs(next);
       setActiveId(next[0].id);
     }
-  }, [info, schema, objects]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [info, schema, objects]);
+
+  // "Manage users" in the connection list opens the workspace straight on the Users tab.
+  useEffect(() => {
+    if (!info || !schema) return;
+    const key = `querybird.open.${sessionId}`;
+    if (load<string | null>(key, null) !== "users") return;
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      /* storage unavailable */
+    }
+    openSpecial("users");
+  }, [info, schema]); // eslint-disable-line react-hooks/exhaustive-deps // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!restored.current || !info) return;
@@ -160,7 +175,7 @@ export function Workspace({ sessionId }: { sessionId: string }) {
     }
     try {
       await api.setSchema(sessionId, s);
-      log(`${info?.connection.driver === "mysql" ? "USE" : "SET search_path TO"} ${s};`);
+      if (info?.connection.driver !== "sqlite") log(`${info?.connection.driver === "mysql" ? "USE" : "SET search_path TO"} ${s};`);
       setSchemaState(s);
       setTabs((t) => t.filter((x) => x.kind === "query"));
     } catch (e) {
@@ -302,8 +317,9 @@ export function Workspace({ sessionId }: { sessionId: string }) {
     reconnect: () => reconnect(),
     disconnect: () => getCurrentWindow().close(),
     overview: () => openSpecial("overview"),
-    users: () => openQuery(usersSql(info!.connection.driver), "Users", true),
-    processes: () => openSpecial("processes"),
+    users: () => openSpecial("users"),
+    new_user: () => (info?.connection.driver === "sqlite" ? toast.show("SQLite databases have no users") : openSpecial("users")),
+    processes: () => (info?.connection.driver === "sqlite" ? toast.show("SQLite has no server processes") : openSpecial("processes")),
     search_db: () => setDialog({ kind: "search" }),
     ask_ai: () => openSpecial("ai"),
   };
@@ -402,11 +418,17 @@ export function Workspace({ sessionId }: { sessionId: string }) {
     }
   };
 
-  const openSpecial = (kind: "overview" | "processes" | "ai") => {
+  const openSpecial = (kind: "overview" | "processes" | "ai" | "users") => {
     const existing = tabs.find((t) => t.kind === kind);
     if (existing) return activate(existing.id);
     const tab: Tab =
-      kind === "overview" ? { id: newId(), kind, title: "Item overview" } : kind === "ai" ? { id: newId(), kind, title: "Ask AI" } : { id: newId(), kind, title: "Processes" };
+      kind === "overview"
+        ? { id: newId(), kind, title: "Item overview" }
+        : kind === "ai"
+          ? { id: newId(), kind, title: "Ask AI" }
+          : kind === "users"
+            ? { id: newId(), kind, title: "Users" }
+            : { id: newId(), kind, title: "Processes" };
     setTabs([...tabs, tab]);
     activate(tab.id);
   };
@@ -421,24 +443,24 @@ export function Workspace({ sessionId }: { sessionId: string }) {
         { label: "Reload workspace", kbd: `⇧${mod}R`, onClick: refreshObjects },
         { separator: true },
         { label: "Item overview", onClick: () => openSpecial("overview") },
-        { label: "Search in Database...", onClick: () => setDialog({ kind: "search" }) },
-        { label: "Process List", onClick: () => openSpecial("processes") },
+        { label: "Search in Database…", onClick: () => setDialog({ kind: "search" }) },
+        ...(info?.connection.driver !== "sqlite" ? [{ label: "Process List", onClick: () => openSpecial("processes") }] : []),
         { label: "Ask AI (natural language → SQL)", kbd: `${mod}J`, onClick: () => openSpecial("ai") },
-        { label: "User Management", onClick: () => openQuery(usersSql(info!.connection.driver), "Users", true) },
+        ...(info?.connection.driver !== "sqlite" ? [{ label: "User Management", onClick: () => openSpecial("users") }] : []),
         { separator: true },
-        { label: "Open SQL file...", kbd: `${mod}O`, onClick: openSqlFile },
+        { label: "Open SQL file…", kbd: `${mod}O`, onClick: openSqlFile },
         {
           label: "Import",
           submenu: [
-            { label: "From CSV...", onClick: () => setDialog({ kind: "importCsv", table: active?.kind === "table" ? active.table : undefined }) },
-            { label: "From SQL Dump...", onClick: () => setDialog({ kind: "importSql" }) },
+            { label: "From CSV…", onClick: () => setDialog({ kind: "importCsv", table: active?.kind === "table" ? active.table : undefined }) },
+            { label: "From SQL Dump…", onClick: () => setDialog({ kind: "importSql" }) },
           ],
         },
-        { label: "Export...", onClick: () => setDialog({ kind: "export", tables: active?.kind === "table" ? [active.table] : [] }) },
-        { label: "Backup database...", onClick: () => setDialog({ kind: "backup" }) },
-        { label: "Restore database...", onClick: () => setDialog({ kind: "restore" }) },
+        { label: "Export…", onClick: () => setDialog({ kind: "export", tables: active?.kind === "table" ? [active.table] : [] }) },
+        { label: "Backup database…", onClick: () => setDialog({ kind: "backup" }) },
+        { label: "Restore database…", onClick: () => setDialog({ kind: "restore" }) },
         { separator: true },
-        { label: "Settings...", kbd: `${mod},`, onClick: () => setDialog({ kind: "settings" }) },
+        { label: "Settings…", kbd: `${mod},`, onClick: () => setDialog({ kind: "settings" }) },
       ],
     });
   };
@@ -510,13 +532,16 @@ export function Workspace({ sessionId }: { sessionId: string }) {
             <button className="icon-btn" title="Open connection list" onClick={() => api.showWelcome()}><IconPlug /></button>
             <button className="icon-btn" title="Close connection" onClick={() => getCurrentWindow().close()}><IconClose /></button>
             <button className="icon-btn" title="Preview pending changes" disabled={!(active && pending[active.id] > 0)} onClick={() => activeApi()?.preview?.()}><IconEye /></button>
-            <button
-              className="icon-btn"
-              title="Process list"
-              onClick={async () => openQuery(await api.processListSql(sessionId), "Processes", true)}
-            >
-              <IconList />
-            </button>
+            {c.driver !== "sqlite" && (
+              <>
+                <button className="icon-btn" title="Process list" onClick={() => openSpecial("processes")}>
+                  <IconList />
+                </button>
+                <button className="icon-btn" title="Users — create users, change passwords, grant access" onClick={() => openSpecial("users")}>
+                  <IconUsers />
+                </button>
+              </>
+            )}
             <button className={`icon-btn${safeMode ? " on" : ""}`} title={safeMode ? "Safe mode ON — writes need confirmation" : "Safe mode OFF"} onClick={() => setSafeMode((s) => !s)}>
               {safeMode ? <IconLock /> : <IconUnlock />}
             </button>
@@ -639,6 +664,8 @@ export function Workspace({ sessionId }: { sessionId: string }) {
                     <OverviewTab register={(a) => (tabApis.current[t.id] = a)} />
                   ) : t.kind === "processes" ? (
                     <ProcessTab register={(a) => (tabApis.current[t.id] = a)} />
+                  ) : t.kind === "users" ? (
+                    <UsersTab register={(a) => (tabApis.current[t.id] = a)} />
                   ) : t.kind === "table" ? (
                     <TableTab
                       schema={t.schema}
@@ -821,7 +848,7 @@ function SchemaPicker({ title, schemas, current, onClose, onPick }: { title: str
     <Modal title={title} width={360} onClose={onClose}>
       <div className="search">
         <IconSearch />
-        <input className="input" autoFocus placeholder="Search..." value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && list[0] && onPick(list[0])} />
+        <input className="input" autoFocus placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && list[0] && onPick(list[0])} />
       </div>
       <div className="anything-list">
         {list.map((s) => (

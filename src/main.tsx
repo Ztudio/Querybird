@@ -18,7 +18,8 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
     return (
       <div style={{ padding: 40, fontFamily: "var(--font-mono)", fontSize: 12, userSelect: "text", overflow: "auto", height: "100%" }}>
         <div style={{ color: "var(--red)", fontSize: 14, marginBottom: 10 }}>Something went wrong</div>
-        <pre style={{ whiteSpace: "pre-wrap" }}>{String(this.state.error.stack || this.state.error)}</pre>
+        {/* WebKit stacks don't include the message, so show it first. */}
+        <pre style={{ whiteSpace: "pre-wrap" }}>{`${String(this.state.error)}\n\n${this.state.error.stack ?? ""}`}</pre>
         <button className="btn" onClick={() => location.reload()}>Reload</button>
       </div>
     );

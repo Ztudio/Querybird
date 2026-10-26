@@ -95,7 +95,7 @@ export function QueryTab({
   const beautify = () => {
     const ed = editor.current!;
     const sel = ed.getSelection();
-    const language = ws.driver === "mysql" ? "mysql" : "postgresql";
+    const language = ws.driver === "mysql" ? "mysql" : ws.driver === "sqlite" ? "sqlite" : "postgresql";
     try {
       const keywordCase = getSettings().uppercaseKeywords ? "upper" : "preserve";
       if (sel.text.trim()) ed.replaceRange(sel.from, sel.to, format(sel.text, { language, keywordCase }));
@@ -288,7 +288,7 @@ function ExportButton({ disabled, onExport }: { disabled: boolean; onExport: (k:
   const [open, setOpen] = useState(false);
   return (
     <div style={{ position: "relative" }}>
-      <button className="btn" disabled={disabled} onClick={() => setOpen((o) => !o)}>Export...</button>
+      <button className="btn" disabled={disabled} onClick={() => setOpen((o) => !o)}>Export…</button>
       {open && (
         <div className="popover" style={{ right: 0, bottom: 28, top: "auto", minWidth: 150 }} onMouseLeave={() => setOpen(false)}>
           {(["csv", "json", "sql"] as const).map((k) => (

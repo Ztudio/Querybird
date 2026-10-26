@@ -83,6 +83,15 @@ export const IconRight = ({ size = 12, ...p }: P) => (
 export const IconSliders = ({ size = 14, ...p }: P) => (
   <svg {...base(size)} {...p}><path d="M2 4.5h12M2 8h12M2 11.5h12" /><circle cx="5" cy="4.5" r="1.4" fill="var(--panel)" /><circle cx="10.5" cy="8" r="1.4" fill="var(--panel)" /><circle cx="7" cy="11.5" r="1.4" fill="var(--panel)" /></svg>
 );
+export const IconUsers = ({ size = 16, ...p }: P) => (
+  <svg {...base(size)} {...p}><circle cx="6" cy="5.5" r="2.3" /><path d="M1.8 13.5c.4-2.4 2.1-3.8 4.2-3.8s3.8 1.4 4.2 3.8" /><path d="M10.6 3.4a2.2 2.2 0 0 1 0 4.2M12.4 10c1 .6 1.6 1.9 1.8 3.5" /></svg>
+);
+export const IconPencil = ({ size = 14, ...p }: P) => (
+  <svg {...base(size)} {...p}><path d="M10.8 2.7a1.6 1.6 0 0 1 2.3 2.3L5.6 12.5 2.5 13.5l1-3.1z" /><path d="M9.6 3.9l2.5 2.5" /></svg>
+);
+export const IconArrowUp = ({ size = 14, ...p }: P) => (
+  <svg {...base(size)} strokeWidth={1.8} {...p}><path d="M8 13V3M3.8 7.2 8 3l4.2 4.2" /></svg>
+);
 export const IconTrash = ({ size = 14, ...p }: P) => (
   <svg {...base(size)} {...p}><path d="M2.5 4.5h11M6 4.5V3h4v1.5M4 4.5l.7 9h6.6l.7-9" /></svg>
 );

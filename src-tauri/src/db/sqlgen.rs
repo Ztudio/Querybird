@@ -8,7 +8,7 @@ pub struct Dialect(pub Driver);
 impl Dialect {
     pub fn ident(&self, name: &str) -> String {
         match self.0 {
-            Driver::Postgres => format!("\"{}\"", name.replace('"', "\"\"")),
+            Driver::Postgres | Driver::Sqlite => format!("\"{}\"", name.replace('"', "\"\"")),
             Driver::Mysql => format!("`{}`", name.replace('`', "``")),
         }
     }
@@ -16,8 +16,10 @@ impl Dialect {
     /// String literal that is safe regardless of server/session settings:
     /// - Postgres: `E'…'` escape-string syntax (correct whether `standard_conforming_strings` is on or off).
     /// - MySQL: `_utf8mb4 X'…'` hex string (immune to `NO_BACKSLASH_ESCAPES` and multi-byte client charsets).
+    /// - SQLite: standard `'…'` (backslash has no special meaning).
     pub fn literal(&self, value: &str) -> String {
         match self.0 {
+            Driver::Sqlite => format!("'{}'", value.replace('\'', "''")),
             Driver::Postgres => format!("E'{}'", value.replace('\\', "\\\\").replace('\'', "''")),
             Driver::Mysql => {
                 if value.is_empty() {
@@ -55,7 +57,7 @@ impl Dialect {
 
     fn as_text(&self, col: &str) -> String {
         match self.0 {
-            Driver::Postgres => format!("CAST({} AS TEXT)", col),
+            Driver::Postgres | Driver::Sqlite => format!("CAST({} AS TEXT)", col),
             Driver::Mysql => col.to_string(),
         }
     }
@@ -63,7 +65,7 @@ impl Dialect {
     fn like(&self) -> &'static str {
         match self.0 {
             Driver::Postgres => "ILIKE",
-            Driver::Mysql => "LIKE",
+            Driver::Mysql | Driver::Sqlite => "LIKE",
         }
     }
 
@@ -252,7 +254,9 @@ impl Dialect {
             ChangeKind::Insert => {
                 if c.values.is_empty() {
                     return Ok(match self.0 {
-                        Driver::Postgres => format!("INSERT INTO {table} DEFAULT VALUES;"),
+                        Driver::Postgres | Driver::Sqlite => {
+                            format!("INSERT INTO {table} DEFAULT VALUES;")
+                        }
                         Driver::Mysql => format!("INSERT INTO {table} () VALUES ();"),
                     });
                 }
@@ -296,6 +300,9 @@ mod tests {
         assert_eq!(pg.literal("it's \\"), "E'it''s \\\\'");
         assert_eq!(my.literal("a'"), "_utf8mb4 X'6127'");
         assert_eq!(my.literal(""), "''");
+        let lite = Dialect(Driver::Sqlite);
+        assert_eq!(lite.ident("a\"b"), "\"a\"\"b\"");
+        assert_eq!(lite.literal("it's \\"), "'it''s \\'");
     }
 
     #[test]

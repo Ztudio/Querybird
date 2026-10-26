@@ -65,6 +65,9 @@ export function structureStatements(
       if (d.dropped || !d.name.trim()) continue;
       if (driver === "mysql") {
         out.push(`ALTER TABLE ${t} ADD COLUMN ${colDef(d)}${d.comment ? ` COMMENT ${quoteLiteral(driver, d.comment)}` : ""};`);
+      } else if (driver === "sqlite") {
+        // SQLite has no column comments.
+        out.push(`ALTER TABLE ${t} ADD COLUMN ${colDef(d)};`);
       } else {
         out.push(`ALTER TABLE ${t} ADD COLUMN ${colDef(d)};`);
         if (d.comment) out.push(`COMMENT ON COLUMN ${t}.${q(d.name)} IS ${quoteLiteral(driver, d.comment)};`);
@@ -90,6 +93,8 @@ export function structureStatements(
       out.push(`ALTER TABLE ${t} RENAME COLUMN ${q(o.name)} TO ${q(d.name)};`);
       name = d.name;
     }
+    // SQLite can only rename in place; type, NULL and default changes need a table rebuild.
+    if (driver === "sqlite") continue;
     if (d.dataType !== o.dataType) {
       out.push(`ALTER TABLE ${t} ALTER COLUMN ${q(name)} TYPE ${d.dataType} USING ${q(name)}::${d.dataType};`);
     }
@@ -125,7 +130,11 @@ export function structureStatements(
         : o?.primary
           ? `ALTER TABLE ${t} DROP CONSTRAINT ${q(name)};`
           : `DROP INDEX ${q(schema)}.${q(name)};`;
-    const create = () => `CREATE ${i.unique ? "UNIQUE " : ""}INDEX ${q(i.name)} ON ${t} (${cols});`;
+    const create = () =>
+      driver === "sqlite"
+        ? // SQLite qualifies the index name, not the table.
+          `CREATE ${i.unique ? "UNIQUE " : ""}INDEX ${q(schema)}.${q(i.name)} ON ${q(table)} (${cols});`
+        : `CREATE ${i.unique ? "UNIQUE " : ""}INDEX ${q(i.name)} ON ${t} (${cols});`;
     if (!o) {
       if (!i.dropped && i.name.trim() && cols) out.push(create());
     } else if (i.dropped) {
@@ -140,6 +149,9 @@ export function structureStatements(
 
 export function createTableTemplate(driver: Driver, schema: string, name = "new_table"): string {
   const q = (s: string) => quoteIdent(driver, s);
+  if (driver === "sqlite") {
+    return `CREATE TABLE ${q(schema)}.${q(name)} (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  name TEXT NOT NULL,\n  created_at TEXT DEFAULT CURRENT_TIMESTAMP\n);\n`;
+  }
   return driver === "mysql"
     ? `CREATE TABLE ${q(schema)}.${q(name)} (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  name VARCHAR(255) NOT NULL,\n  created_at DATETIME DEFAULT CURRENT_TIMESTAMP\n);\n`
     : `CREATE TABLE ${q(schema)}.${q(name)} (\n  id BIGSERIAL PRIMARY KEY,\n  name TEXT NOT NULL,\n  created_at TIMESTAMPTZ DEFAULT now()\n);\n`;
@@ -161,6 +173,10 @@ export function cloneTableStatements(driver: Driver, schema: string, table: stri
   const q = (s: string) => quoteIdent(driver, s);
   const src = `${q(schema)}.${q(table)}`;
   const dst = `${q(schema)}.${q(target)}`;
+  if (driver === "sqlite") {
+    // SQLite has no CREATE TABLE … LIKE; this copies columns and types but not keys or indexes.
+    return [`CREATE TABLE ${dst} AS SELECT * FROM ${src}${withData ? "" : " WHERE 0"};`];
+  }
   const create =
     driver === "mysql" ? `CREATE TABLE ${dst} LIKE ${src};` : `CREATE TABLE ${dst} (LIKE ${src} INCLUDING ALL);`;
   return withData ? [create, `INSERT INTO ${dst} SELECT * FROM ${src};`] : [create];
