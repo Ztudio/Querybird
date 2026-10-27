@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { api, errorText, type AiAnswer, type AiStatus, type ChatGptStatus, type CodexModels, type QueryResult } from "../api";
 import { Modal } from "../components/ui";
-import { IconArrowUp, IconChevronDown, IconSparkle } from "../components/icons";
+import { IconArrowUp, IconChevronDown, IconPlus, IconChat } from "../components/icons";
 import { CLAUDE_MODELS, MANAGE_USAGE_URL, activeModel, aiReady, autoPickLocalCli, getSettings, updateSettings, useSettings, type Settings } from "../lib/settings";
 import { ChatGptWelcome } from "../components/SettingsModal";
 import { isReadOnly, writeRisk } from "../lib/sql";
-import { DataGrid, type GridSelection } from "./DataGrid";
-import { useWs, type Details, type TabApi } from "./context";
+import { DataGrid } from "./DataGrid";
+import { useWs } from "./context";
 
 interface Turn {
   id: number;
@@ -33,18 +33,8 @@ interface Source {
 
 let turnSeq = 1;
 
-/** "Ask AI": a question in plain language → SQL (shown) → run → results, all visible to the engineer. */
-export function AskTab({
-  active,
-  onDetails,
-  register,
-  onOpenSettings,
-}: {
-  active: boolean;
-  onDetails: (d: Details | null) => void;
-  register: (a: TabApi) => void;
-  onOpenSettings: () => void;
-}) {
+/** "Ask AI" lives in the right sidebar: a question in plain language → SQL (shown) → run → results, all visible to the engineer. */
+export function AskTab({ active, onOpenSettings }: { active: boolean; onOpenSettings: () => void }) {
   const ws = useWs();
   const settings = useSettings();
   const [question, setQuestion] = useState("");
@@ -54,10 +44,7 @@ export function AskTab({
   const [gpt, setGpt] = useState<ChatGptStatus | null>(null);
   const [confirm, setConfirm] = useState<Turn | null>(null);
   const [context, setContext] = useState<Turn | null>(null);
-  const [sel, setSel] = useState<GridSelection>({ rows: [], focus: null });
-  const [split, setSplit] = useState(0.6);
   const input = useRef<HTMLTextAreaElement>(null);
-  const body = useRef<HTMLDivElement>(null);
   const log = useRef<HTMLDivElement>(null);
 
   const provider = settings.aiProvider;
@@ -79,8 +66,13 @@ export function AskTab({
       .catch(() => setStatus(null));
     input.current?.focus();
     const onFocus = () => refreshStatus();
+    const focusInput = () => input.current?.focus();
     window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
+    window.addEventListener("querybird:focus-ai", focusInput);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("querybird:focus-ai", focusInput);
+    };
   }, []);
 
   const ready = aiReady(settings, status, gpt);
@@ -95,8 +87,8 @@ export function AskTab({
   }, [viaChatGpt, gpt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sources: Source[] = [
-    { id: "claudeCode", label: "Claude Code", patch: { aiProvider: "claude", claudeAuth: "claudeCode" }, available: !!status?.claudeCodePath },
-    { id: "codex", label: "Codex", patch: { aiProvider: "openai", openaiAuth: "codex" }, available: !!status?.codexPath },
+    { id: "claudeCode", label: "Claude Code (local)", patch: { aiProvider: "claude", claudeAuth: "claudeCode" }, available: !!status?.claudeCodePath },
+    { id: "codex", label: "Codex (local)", patch: { aiProvider: "openai", openaiAuth: "codex" }, available: !!status?.codexPath },
     { id: "chatgpt", label: "ChatGPT", patch: { aiProvider: "openai", openaiAuth: "chatgpt" }, available: !!gpt?.signedIn && !!gpt.planUsage },
     { id: "ant", label: "Claude (Anthropic sign-in)", patch: { aiProvider: "claude", claudeAuth: "antCli" }, available: !!status?.antInstalled },
     { id: "claudeKey", label: "Claude API key", patch: { aiProvider: "claude", claudeAuth: "apiKey" }, available: !!status?.claudeKey },
@@ -180,9 +172,9 @@ export function AskTab({
     if (!fixing) setQuestion("");
     stick.current = true;
     const history = turns
-      .filter((t) => t.answer?.sql)
+      .filter((t) => t.answer)
       .slice(-6)
-      .map((t) => ({ question: t.question, sql: t.answer!.sql, error: t.runError ?? null }));
+      .map((t) => ({ question: t.question, sql: t.answer!.sql, explanation: t.answer!.explanation, error: t.runError ?? null }));
     const started = performance.now();
     try {
       const s = getSettings();
@@ -203,54 +195,25 @@ export function AskTab({
     }
   };
 
-  useEffect(() => {
-    register({
-      // Reload re-runs only read-only answers; writes always go back through the confirmation.
-      reload: () => {
-        const t = turns.find((x) => x.id === selected);
-        if (t?.answer?.sql && !t.answer.modifiesData && isReadOnly(t.answer.sql)) run(t);
-      },
-      runCurrent: () => ask(),
-    });
-  });
-
   const current = turns.find((t) => t.id === selected) ?? null;
   const result = current?.result;
 
-  useEffect(() => {
-    if (!active) return;
-    const r = sel.focus?.r;
-    onDetails(result && r != null && result.rows[r] ? { columns: result.columns, row: result.rows[r], editable: false } : { columns: [], row: null, editable: false });
-  }, [active, sel, result]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const startDrag = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const box = body.current!.getBoundingClientRect();
-    const onMove = (ev: MouseEvent) => setSplit(Math.min(0.85, Math.max(0.2, (ev.clientY - box.top) / box.height)));
-    const onUp = () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  };
-
   return (
-    <div className="tab-body" ref={body}>
-      <div className="ask-top" style={{ height: `${split * 100}%` }}>
+    <div className="ask-panel">
+      <div className="ask-top">
         <div className="ask-log" ref={log}>
           {!turns.length && (
             <div className="ask-empty">
-              <IconSparkle size={22} className="ask-empty-icon" />
+              <IconChat size={22} className="ask-empty-icon" />
               <div className="ask-empty-title">Ask your database in plain language</div>
               <div className="faint">
-                The AI writes the SQL, Querybird shows it to you, runs it, and displays the result. Only the schema
+                Ask for data and the AI writes the SQL, which you see before it runs. Ask about the schema and it answers in plain text. Only the schema
                 ({plural(ws.objects.tables.length, "table")}, {plural(ws.objects.views.length, "view")} in <b>{ws.schema}</b>) is sent — never your data.
               </div>
               <div className="ask-examples">
                 {["Top 10 customers by total order value", "How many orders per status this month?", "Products that are out of stock but still active"].map((ex) => (
                   <button key={ex} className="ask-example" onClick={() => (setQuestion(ex), input.current?.focus())}>
-                    <IconSparkle size={12} /> {ex}
+                    <IconChat size={12} /> {ex}
                   </button>
                 ))}
               </div>
@@ -258,7 +221,7 @@ export function AskTab({
           )}
           {turns.length > 0 && (
             <div className="ask-log-head">
-              <button className="btn small" onClick={() => (setTurns([]), setSelected(null))}>New conversation</button>
+              <button className="btn small" onClick={() => (setTurns([]), setSelected(null))}><IconPlus size={11} /> New chat</button>
             </div>
           )}
           {turns.map((t) => (
@@ -267,7 +230,7 @@ export function AskTab({
                 <div className="ask-bubble">{t.question}</div>
               </div>
               <div className={`ask-reply${t.id === selected ? " selected" : ""}`}>
-                {t.status === "asking" && <Thinking label={`Writing SQL with ${sourceLabel}`} />}
+                {t.status === "asking" && <Thinking label={`Thinking with ${sourceLabel}`} />}
                 {t.askError && (
                   <div className="ask-error">
                     {t.askError}
@@ -323,6 +286,12 @@ export function AskTab({
                     }
                   />
                 )}
+                {t.id === selected && t.status === "running" && <div className="faint ask-note">Running…</div>}
+                {t.id === selected && result?.columns.length ? (
+                  <div className="ask-result">
+                    <DataGrid columns={result.columns} rows={result.rows} rowNumbers dataKey={`${t.id}-${t.runMs}`} />
+                  </div>
+                ) : null}
               </div>
             </div>
           ))}
@@ -334,7 +303,7 @@ export function AskTab({
               ref={input}
               rows={1}
               value={question}
-              placeholder={ready ? `Ask about ${ws.schema}… e.g. “revenue per country, highest first”` : "Choose an AI source below to start"}
+              placeholder={ready ? `Ask about ${ws.schema}…` : "Set up an AI source"}
               onChange={(e) => setQuestion(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey || !e.shiftKey)) {
@@ -346,7 +315,7 @@ export function AskTab({
             <div className="ask-tools" onClick={(e) => e.stopPropagation()}>
               <PillSelect
                 title="Where the AI runs"
-                icon={<IconSparkle size={12} />}
+                icon={<IconChat size={12} />}
                 value={source.id}
                 label={source.label}
                 warn={!ready}
@@ -386,25 +355,6 @@ export function AskTab({
               </button>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div className="splitter-h" onMouseDown={startDrag} />
-
-      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-        {result?.columns.length ? (
-          <DataGrid columns={result.columns} rows={result.rows} rowNumbers dataKey={`${current!.id}-${current!.runMs}`} onSelectionChange={setSel} />
-        ) : (
-          <div className="empty faint">
-            {current?.status === "running" ? "Running…" : current?.result ? `${current.result.affected ?? 0} rows affected` : current?.runError ? "The query failed — see the message above." : "Results appear here"}
-          </div>
-        )}
-        <div className="bottom-bar">
-          <span className="muted">Ask AI</span>
-          <span className="spacer" />
-          <span className="muted status-text">{current?.question ? `“${current.question.slice(0, 80)}${current.question.length > 80 ? "…" : ""}”` : ""}</span>
-          <span className="spacer" />
-          <span className="muted">{result?.columns.length ? `${result.rows.length.toLocaleString()} rows` : ""}</span>
         </div>
       </div>
 
@@ -569,7 +519,7 @@ function Answer({ turn, animate, onRevealed, footer }: { turn: Turn; animate: bo
           </pre>
         )
       ) : (
-        done && <div className="faint">No SQL was generated for this question.</div>
+        done && !expl && <div className="faint">No answer came back. Try rephrasing.</div>
       )}
       {done && footer}
     </>

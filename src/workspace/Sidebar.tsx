@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, errorText } from "../api";
-import { IconChevron, IconFunction, IconPlus, IconQuery, IconSearch, IconTable, IconView } from "../components/icons";
-import { Modal, load, mod, save, type MenuItem } from "../components/ui";
+import {
+  IconChevron, IconChevronDown, IconDatabase, IconFunction, IconGear, IconInfo, IconList, IconMore, IconQuery, IconRefresh,
+  IconPalette, IconSearch, IconShield, IconChat, IconTable, IconTerminal, IconUsers, IconView,
+} from "../components/icons";
+import { Modal, load, mod, save, tagColor, type MenuItem } from "../components/ui";
 import { cloneTableStatements, createFunctionTemplate, createTableTemplate, createViewTemplate } from "../lib/ddl";
 import { quoteIdent } from "../lib/export";
-import { getSettings } from "../lib/settings";
+import { getSettings, updateSettings, useSettings } from "../lib/settings";
+import { THEMES, SYSTEM_THEME } from "../lib/themes";
 import { useWs } from "./context";
 
 export interface SavedQuery {
@@ -16,6 +20,24 @@ export interface SavedQuery {
 export interface HistoryItem {
   sql: string;
   at: number;
+}
+
+export interface SidebarNav {
+  name: string;
+  tag: string;
+  meta: string;
+  color: string;
+  safeMode: boolean;
+  pendingTotal: number;
+  onSafeMode: () => void;
+  onNewQuery: () => void;
+  onAsk: () => void;
+  onProcesses: () => void;
+  onUsers: () => void;
+  onSearchDb: () => void;
+  onSettings: () => void;
+  onMore: (e: React.MouseEvent) => void;
+  onConnection: (e: React.MouseEvent) => void;
 }
 
 export function Sidebar({
@@ -31,6 +53,7 @@ export function Sidebar({
   onImportCsv,
   onImportSql,
   onOverview,
+  nav,
 }: {
   schemas: string[];
   activeTable: string | null;
@@ -44,11 +67,15 @@ export function Sidebar({
   onImportCsv: (table?: string) => void;
   onImportSql: () => void;
   onOverview: () => void;
+  nav: SidebarNav;
 }) {
   const ws = useWs();
+  const settings = useSettings();
   const [mode, setMode] = useState<"items" | "queries" | "history">("items");
   const [q, setQ] = useState("");
   const [open, setOpen] = useState({ functions: false, tables: true, views: true });
+  const [toolsOpen, setToolsOpen] = useState(() => load("querybird.toolsOpen", true));
+  useEffect(() => save("querybird.toolsOpen", toolsOpen), [toolsOpen]);
   const [selected, setSelected] = useState<string | null>(null);
   const [danger, setDanger] = useState<{ title: string; sql: string } | null>(null);
   const [clone, setClone] = useState<{ table: string; name: string; withData: boolean } | null>(null);
@@ -150,8 +177,47 @@ export function Sidebar({
 
   return (
     <div className="sidebar">
+      <button className="conn-card" onClick={nav.onConnection} title="Switch or close this connection">
+        <span className="conn-card-dot" style={{ background: nav.color || tagColor(nav.tag) }} />
+        <span className="conn-card-text">
+          <span className="conn-card-name">{nav.name}</span>
+          <span className="conn-card-meta">{nav.meta} · {nav.tag}</span>
+        </span>
+        <IconChevronDown size={12} />
+      </button>
+
+      <div className="side-actions">
+        <button className="side-btn primary" onClick={nav.onNewQuery} title={`New SQL query (${mod}T)`}>
+          <IconTerminal size={15} /> New query <kbd>{mod}T</kbd>
+        </button>
+        <button className="side-btn" onClick={nav.onAsk} title={`Ask your database in plain language (${mod}J)`}>
+          <IconChat size={15} /> Ask AI <kbd>{mod}J</kbd>
+        </button>
+        <label className="side-btn side-select" title={ws.driver === "mysql" ? "Switch database" : "Switch schema"}>
+          <IconDatabase size={15} />
+          <span className="side-select-text">{ws.schema}</span>
+          <IconChevronDown size={11} />
+          <select value={ws.schema} onChange={(e) => onSchema(e.target.value)} aria-label={ws.driver === "mysql" ? "Database" : "Schema"}>
+            {!schemas.includes(ws.schema) && <option value={ws.schema}>{ws.schema}</option>}
+            {schemas.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </label>
+      </div>
+
+      <div className="side-group" onClick={() => setToolsOpen((o) => !o)}>
+        <IconChevron open={toolsOpen} size={10} /> Tools
+      </div>
+      {toolsOpen && (
+        <div className="side-nav">
+          <button className="side-btn" onClick={onOverview} title="Sizes, rows and details for every table"><IconInfo size={15} /> Overview</button>
+          <button className="side-btn" onClick={nav.onSearchDb} title="Find a value anywhere in the database"><IconSearch size={15} /> Search database</button>
+          {ws.driver !== "sqlite" && <button className="side-btn" onClick={nav.onProcesses} title="See running queries and stop them"><IconList size={15} /> Processes</button>}
+          {ws.driver !== "sqlite" && <button className="side-btn" onClick={nav.onUsers} title="Create users, change passwords, grant access"><IconUsers size={15} /> Users &amp; access</button>}
+        </div>
+      )}
+
       <div className="sidebar-modes">
-        <div className="segmented" style={{ width: "100%", justifyContent: "space-between" }}>
+        <div className="segmented" style={{ width: "100%", justifyContent: "space-between" }} role="tablist">
           {(["items", "queries", "history"] as const).map((m) => (
             <button key={m} className={mode === m ? "active" : ""} style={{ flex: 1 }} onClick={() => setMode(m)}>
               {m[0].toUpperCase() + m.slice(1)}
@@ -190,7 +256,7 @@ export function Sidebar({
                     >
                       {g.icon}
                       <span className="tree-label">{name}</span>
-                      {pins.includes(name) && <span className="pin" title="Pinned">●</span>}
+                      {pins.includes(name) && <span className="pin" title="Pinned" />}
                     </div>
                   );
                 })}
@@ -244,14 +310,38 @@ export function Sidebar({
       </div>
 
       <div className="sidebar-foot">
-        <button className="btn small" title="New SQL query (⌘T)" onClick={() => ws.openQuery("")}>
-          <IconPlus size={11} />
+        <button
+          className={`safe-toggle${nav.safeMode ? " on" : ""}`}
+          role="switch"
+          aria-checked={nav.safeMode}
+          title={nav.safeMode ? "Safe mode is on: every write asks for confirmation. Click to turn off." : "Safe mode is off. Turn on to confirm every write."}
+          onClick={nav.onSafeMode}
+        >
+          <IconShield size={15} />
+          <span>Safe mode</span>
+          <span className="switch"><span /></span>
         </button>
-        <button className="btn small" title="Refresh items" onClick={onRefresh}>↻</button>
-        <select className="input" style={{ flex: 1, height: 22 }} value={ws.schema} onChange={(e) => onSchema(e.target.value)} title={ws.driver === "mysql" ? "Database" : "Schema"}>
-          {!schemas.includes(ws.schema) && <option value={ws.schema}>{ws.schema}</option>}
-          {schemas.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
+        <button
+          className="icon-btn"
+          title="Theme"
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            ws.setMenu({
+              x: Math.max(8, r.left),
+              y: r.top - 8 - (THEMES.length + 1) * 30,
+              items: [
+                { label: "Match system", checked: settings.theme === SYSTEM_THEME, onClick: () => updateSettings({ theme: SYSTEM_THEME }) },
+                { separator: true },
+                ...THEMES.map((t) => ({ label: t.name, checked: settings.theme === t.id, onClick: () => updateSettings({ theme: t.id }) })),
+              ],
+            });
+          }}
+        >
+          <IconPalette size={15} />
+        </button>
+        <button className="icon-btn" title="Refresh tables" onClick={onRefresh}><IconRefresh size={15} /></button>
+        <button className="icon-btn" title="Settings" onClick={nav.onSettings}><IconGear size={15} /></button>
+        <button className="icon-btn" title="Import, export, backup and more" onClick={nav.onMore}><IconMore size={16} /></button>
       </div>
 
       {danger && (

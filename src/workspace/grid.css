@@ -11,15 +11,15 @@
 .g-head {
   position: sticky;
   top: 0;
-  height: 26px;
+  height: 28px;
   z-index: 3;
-  background: var(--panel);
+  background: var(--toolbar);
   border-bottom: 1px solid var(--border);
 }
 .g-hcell {
   position: absolute;
   top: 0;
-  height: 26px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -27,16 +27,16 @@
   padding: 0 8px;
   border-right: 1px solid var(--grid-line);
   font-family: var(--font-ui);
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
   white-space: nowrap;
 }
-.g-hcell:hover { background: var(--panel-2); }
+@media (hover: hover) { .g-hcell:hover { background: var(--panel-2); color: var(--text); } }
 .g-htext { overflow: hidden; text-overflow: ellipsis; }
 .g-sort { font-size: 8px; color: var(--text-2); }
 .g-resize { position: absolute; right: -4px; top: 0; width: 8px; height: 100%; cursor: col-resize; z-index: 2; }
-.g-row { position: absolute; left: 0; height: 23px; background: var(--bg); }
+.g-row { position: absolute; left: 0; height: 25px; background: var(--bg); }
 .g-row.odd { background: var(--bg-alt); }
 .no-stripes .g-row.odd { background: var(--bg); }
 .g-row.sel { background: var(--row-selected); }
@@ -46,8 +46,8 @@
 .g-cell {
   position: absolute;
   top: 0;
-  height: 23px;
-  line-height: 23px;
+  height: 25px;
+  line-height: 25px;
   padding: 0 6px;
   border-right: 1px solid var(--grid-line);
   white-space: nowrap;
@@ -83,13 +83,13 @@
 .g-cell.editing { padding: 0; overflow: visible; z-index: 2; }
 .g-input {
   width: 100%;
-  height: 23px;
+  height: 25px;
   border: 0;
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
+  outline: 1px solid var(--focus-ring);
+  outline-offset: -1px;
   background: var(--input);
   font-family: var(--font-mono);
   font-size: 12px;
   padding: 0 6px;
 }
-.g-filler { position: absolute; left: 0; height: 690px; }
+.g-filler { position: absolute; left: 0; height: 750px; }

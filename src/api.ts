@@ -200,6 +200,7 @@ export interface ChatGptStatus {
 export interface AiTurn {
   question: string;
   sql: string;
+  explanation?: string;
   error?: string | null;
 }
 

@@ -30,7 +30,7 @@ const theme = EditorView.theme({
   ".cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection": { backgroundColor: "var(--accent-soft) !important" },
   ".cm-cursor": { borderLeftColor: "var(--text)" },
   ".cm-tooltip": { backgroundColor: "var(--panel-2)", border: "1px solid var(--border-soft)", borderRadius: "6px" },
-  ".cm-tooltip-autocomplete ul li[aria-selected]": { backgroundColor: "var(--accent)", color: "#fff" },
+  ".cm-tooltip-autocomplete ul li[aria-selected]": { backgroundColor: "var(--sel)", color: "var(--text)" },
   ".cm-placeholder": { color: "var(--text-3)" },
   ".cm-matchingBracket": { backgroundColor: "var(--accent-soft)", outline: "none" },
   ".cm-selectionMatch": { backgroundColor: "color-mix(in srgb, var(--accent) 22%, transparent)" },

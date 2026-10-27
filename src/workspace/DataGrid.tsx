@@ -2,12 +2,12 @@ import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, u
 import type { Cell, ColumnMeta, ForeignRef, SortSpec } from "../api";
 import { DEFAULT_VALUE } from "../lib/edits";
 import { parseCsv } from "../lib/csv";
-import { IconArrow } from "../components/icons";
+import { IconArrow, IconSortDown, IconSortUp } from "../components/icons";
 import { toTsv } from "../lib/export";
 import "./grid.css";
 
-const ROW_H = 23;
-const HEAD_H = 26;
+const ROW_H = 25;
+const HEAD_H = 28;
 const NUMERIC = /^(int|integer|bigint|smallint|tinyint|mediumint|serial|bigserial|numeric|decimal|newdecimal|float|double|real|money|long|longlong|short|tiny|int24|oid)/i;
 
 export interface GridSelection {
@@ -418,7 +418,7 @@ export const DataGrid = forwardRef<DataGridHandle, Props>(function DataGrid(prop
                 if (i < 0) return null;
                 return (
                   <span className="g-sort">
-                    {sorts![i].desc ? "▼" : "▲"}
+                    {sorts![i].desc ? <IconSortDown /> : <IconSortUp />}
                     {sorts!.length > 1 ? i + 1 : ""}
                   </span>
                 );

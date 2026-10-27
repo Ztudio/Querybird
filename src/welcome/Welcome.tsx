@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { api, errorText, type ConnectionConfig, type Driver } from "../api";
-import { IconChevron, IconDatabase, IconPencil, IconPlug, IconPlus, IconSearch, IconTrash, IconUsers } from "../components/icons";
+import { IconBox, IconChevron, IconDatabase, IconGear, IconPencil, IconPlug, IconPlus, IconSearch, IconTrash, IconUsers } from "../components/icons";
 import { ContextMenu, DRIVERS, DriverBadge, Modal, isMac, load, save, tagColor, useToast, type MenuItem, type MenuState } from "../components/ui";
 import { BackupDialog } from "../components/BackupDialog";
 import { SettingsModal } from "../components/SettingsModal";
@@ -421,24 +421,6 @@ function GroupPrompt({ initial, onClose, onSubmit }: { initial: string; onClose:
     >
       <input className="input" style={{ width: "100%" }} autoFocus value={name} placeholder="Group name" onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && name.trim() && onSubmit(name.trim())} />
     </Modal>
-  );
-}
-
-function IconGear() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3">
-      <circle cx="8" cy="8" r="2.2" />
-      <path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function IconBox({ down }: { down: boolean }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2.5 9.5v3.5h11V9.5" />
-      {down ? <path d="M8 2.5v7M5 6.5l3 3 3-3" /> : <path d="M8 9.5v-7M5 5.5l3-3 3 3" />}
-    </svg>
   );
 }
 

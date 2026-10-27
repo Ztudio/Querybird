@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Welcome } from "./welcome/Welcome";
 import { Workspace } from "./workspace/Workspace";
+import { TooltipLayer } from "./components/Tooltip";
 import "./styles.css";
 import { applySettings } from "./lib/settings";
 
@@ -62,7 +63,10 @@ window.addEventListener("contextmenu", (e) => {
 try {
   const label = getCurrentWindow().label;
   ReactDOM.createRoot(document.getElementById("root")!).render(
-    <ErrorBoundary>{label.startsWith("ws-") ? <Workspace sessionId={label.slice(3)} /> : <Welcome />}</ErrorBoundary>,
+    <ErrorBoundary>
+      {label.startsWith("ws-") ? <Workspace sessionId={label.slice(3)} /> : <Welcome />}
+      <TooltipLayer />
+    </ErrorBoundary>,
   );
 } catch (e) {
   showFatal(String((e as Error).stack || e));
