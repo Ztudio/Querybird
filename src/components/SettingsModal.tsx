@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, errorText, type AiStatus, type ChatGptStatus, type CodexModels } from "../api";
 import { CLAUDE_MODELS, DEFAULT_SETTINGS, MANAGE_USAGE_URL, getSettings, updateSettings, useSettings } from "../lib/settings";
+import { THEMES, SYSTEM_THEME } from "../lib/themes";
+import { IconDot } from "./icons";
 import { Modal } from "./ui";
 
 type SettingsTab = "general" | "editor" | "data" | "tools" | "ai";
@@ -43,11 +45,22 @@ export function SettingsModal({ onClose, initialTab = "general" }: { onClose: ()
         {tab === "general" && (
           <>
             <label>Theme</label>
-            <select className="input" value={s.theme} onChange={(e) => updateSettings({ theme: e.target.value as typeof s.theme })}>
-              <option value="system">Auto (system)</option>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-            </select>
+            <div className="theme-grid" role="radiogroup" aria-label="Theme">
+              <button role="radio" aria-checked={s.theme === SYSTEM_THEME} className={`theme-card${s.theme === SYSTEM_THEME ? " selected" : ""}`} onClick={() => updateSettings({ theme: SYSTEM_THEME })}>
+                <span className="theme-swatch theme-swatch-system"><span /><span /></span>
+                <span className="theme-name">Match system</span>
+              </button>
+              {THEMES.map((t) => (
+                <button key={t.id} role="radio" aria-checked={s.theme === t.id} className={`theme-card${s.theme === t.id ? " selected" : ""}`} onClick={() => updateSettings({ theme: t.id })}>
+                  <span className="theme-swatch" style={{ background: t.ui.background, borderColor: t.ui.border }}>
+                    <span style={{ background: t.ui.sidebar, borderColor: t.ui.border }} />
+                    <i style={{ background: t.ui.highlight }} />
+                    <b style={{ background: t.ui.mutedForeground }} />
+                  </span>
+                  <span className="theme-name">{t.name}</span>
+                </button>
+              ))}
+            </div>
             <label>{navigator.userAgent.includes("Mac") ? "⌘T" : "Ctrl+T"} opens</label>
             <select className="input" value={s.cmdTOpens} onChange={(e) => updateSettings({ cmdTOpens: e.target.value as typeof s.cmdTOpens })}>
               <option value="query">SQL Query Editor tab</option>
@@ -207,7 +220,7 @@ function AiSettings() {
         <>
           <label>Connect with</label>
           <div style={{ display: "grid", gap: 6 }}>
-            <label className="row"><input type="radio" checked={s.claudeAuth === "claudeCode"} onChange={() => updateSettings({ claudeAuth: "claudeCode" })} /> Claude Code on this computer (uses its sign-in)</label>
+            <label className="row"><input type="radio" checked={s.claudeAuth === "claudeCode"} onChange={() => updateSettings({ claudeAuth: "claudeCode" })} /> Claude Code (local) — connected automatically, uses this computer’s sign-in</label>
             <label className="row"><input type="radio" checked={s.claudeAuth === "antCli"} onChange={() => updateSettings({ claudeAuth: "antCli" })} /> Sign in with Anthropic (browser)</label>
             <label className="row"><input type="radio" checked={s.claudeAuth === "apiKey"} onChange={() => updateSettings({ claudeAuth: "apiKey" })} /> Anthropic API key</label>
           </div>
@@ -298,7 +311,7 @@ function AiSettings() {
                 <div style={{ display: "grid", gap: 6 }}>
                   <div className="row" style={{ flexWrap: "wrap" }}>
                     <span style={{ color: gpt.planUsage ? "var(--green)" : "var(--orange)" }}>
-                      ● {gpt.email ?? "Signed in"} · {gpt.planUsage ? "Using ChatGPT plan" : "plan usage not granted"}
+                      <IconDot /> {gpt.email ?? "Signed in"} · {gpt.planUsage ? "Using ChatGPT plan" : "plan usage not granted"}
                     </span>
                     <button className="btn small" onClick={() => api.openHelpUrl(MANAGE_USAGE_URL)}>Manage usage</button>
                     <button
@@ -384,7 +397,7 @@ function LocalCli({ name, path, signIn, install, onRecheck }: { name: string; pa
       <label>{name}</label>
       {path ? (
         <div style={{ display: "grid", gap: 4 }}>
-          <span style={{ color: "var(--green)" }}>● Found at <code className="mono">{path}</code></span>
+          <span style={{ color: "var(--green)" }}><IconDot /> Found at <code className="mono">{path}</code></span>
           <span className="faint" style={{ fontSize: 11.5 }}>
             Uses the account you’re signed in with there (run <code className="mono">{signIn}</code> in Terminal if you aren’t). It runs with
             every tool turned off — it only sees your question and the schema, and can’t run commands or read files.

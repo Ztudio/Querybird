@@ -1,129 +1,84 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ComponentType } from "react";
+import {
+  ArrowRight, ArrowUp, ArrowDown, Check, Copy, Play, ChatCircle, Circle, Palette, ArrowLineDown, ArrowLineUp, CaretDown, CaretLeft, CaretRight, ChartBar, Code, Cube, Database, DotsThree,
+  Eye, Function as PhFunction, Gear, ListBullets, Lock, LockOpen, MagnifyingGlass, Minus, PencilSimple, Plugs, Plus,
+  ArrowsClockwise, SlidersHorizontal, SquareHalfBottom, Table, Terminal, Trash, UsersThree, X, Columns, FileSql,
+  ClockCounterClockwise, BookmarkSimple, ShieldCheck, Power, Info, SidebarSimple as PhSidebar, FolderSimple,
+  type IconProps,
+} from "@phosphor-icons/react";
 
 type P = { size?: number; style?: CSSProperties; className?: string };
-const base = (size = 16) => ({
-  width: size,
-  height: size,
-  viewBox: "0 0 16 16",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 1.4,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-});
 
-export const IconSearch = ({ size = 13, ...p }: P) => (
-  <svg {...base(size)} {...p}><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5 14 14" /></svg>
-);
-export const IconPlus = ({ size = 14, ...p }: P) => (
-  <svg {...base(size)} {...p}><path d="M8 3v10M3 8h10" /></svg>
-);
-export const IconSparkle = ({ size = 13, ...p }: P) => (
-  <svg {...base(size)} {...p}><path d="M8 1.8 9.3 6l4.2 1.3-4.2 1.3L8 12.8 6.7 8.6 2.5 7.3 6.7 6zM12.6 11.2l.5 1.4 1.4.5-1.4.5-.5 1.4-.5-1.4-1.4-.5 1.4-.5z" /></svg>
-);
-export const IconMinus = ({ size = 10, ...p }: P) => (
-  <svg {...base(size)} {...p}><path d="M3 8h10" /></svg>
-);
-export const IconPlug = ({ size = 16, ...p }: P) => (
-  <svg {...base(size)} {...p}><circle cx="8" cy="8" r="6.3" /><path d="M6.3 4.8v2.2M9.7 4.8v2.2M5.3 7h5.4v1.3a2.7 2.7 0 0 1-5.4 0zM8 11v1.6" /></svg>
-);
-export const IconClose = ({ size = 16, ...p }: P) => (
-  <svg {...base(size)} {...p}><circle cx="8" cy="8" r="6.3" /><path d="m5.8 5.8 4.4 4.4m0-4.4-4.4 4.4" /></svg>
-);
-export const IconX = ({ size = 10, ...p }: P) => (
-  <svg {...base(size)} {...p}><path d="m4 4 8 8m0-8-8 8" /></svg>
-);
-export const IconEye = ({ size = 16, ...p }: P) => (
-  <svg {...base(size)} {...p}><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" /><circle cx="8" cy="8" r="2" /></svg>
-);
-export const IconList = ({ size = 16, ...p }: P) => (
-  <svg {...base(size)} {...p}><path d="M2.5 4h11M2.5 7h11M2.5 10h7M2.5 13h5" /></svg>
-);
-export const IconLock = ({ size = 16, ...p }: P) => (
-  <svg {...base(size)} {...p}><rect x="3.5" y="7" width="9" height="6.5" rx="1.3" /><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" /></svg>
-);
-export const IconUnlock = ({ size = 16, ...p }: P) => (
-  <svg {...base(size)} {...p}><rect x="3.5" y="7" width="9" height="6.5" rx="1.3" /><path d="M5.5 7V5a2.5 2.5 0 0 1 4.9-.7" /></svg>
-);
-export const IconDatabase = ({ size = 16, ...p }: P) => (
-  <svg {...base(size)} {...p}><ellipse cx="8" cy="4" rx="5" ry="2" /><path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2" /></svg>
-);
-export const IconChart = ({ size = 16, ...p }: P) => (
-  <svg {...base(size)} {...p}><path d="M2.5 13.5h11M4.5 11V8M7.5 11V5M10.5 11V7M13 11V3.5" /></svg>
-);
-export const IconRefresh = ({ size = 16, ...p }: P) => (
-  <svg {...base(size)} {...p}><path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.5v3h-3" /></svg>
-);
-export const IconMore = ({ size = 16, ...p }: P) => (
-  <svg {...base(size)} {...p}><circle cx="8" cy="3.5" r=".6" fill="currentColor" /><circle cx="8" cy="8" r=".6" fill="currentColor" /><circle cx="8" cy="12.5" r=".6" fill="currentColor" /></svg>
-);
-export const IconSidebarLeft = ({ size = 18, ...p }: P) => (
-  <svg {...base(size)} {...p}><rect x="1.5" y="2.5" width="13" height="11" rx="1.5" /><path d="M5.5 2.5v11" /><path d="M2.6 4.5h1.8M2.6 6.5h1.8" /></svg>
-);
-export const IconSidebarBottom = ({ size = 18, ...p }: P) => (
-  <svg {...base(size)} {...p}><rect x="1.5" y="2.5" width="13" height="11" rx="1.5" /><path d="M1.5 10h13" /></svg>
-);
-export const IconSidebarRight = ({ size = 18, ...p }: P) => (
-  <svg {...base(size)} {...p}><rect x="1.5" y="2.5" width="13" height="11" rx="1.5" /><path d="M10.5 2.5v11" /><path d="M11.6 4.5h1.8M11.6 6.5h1.8" /></svg>
-);
-export const IconChevron = ({ size = 10, open = false, ...p }: P & { open?: boolean }) => (
-  <svg {...base(size)} {...p} style={{ transform: open ? "rotate(90deg)" : undefined, transition: "transform .12s", ...p.style }}>
-    <path d="m6 3.5 4.5 4.5L6 12.5" />
-  </svg>
-);
-export const IconChevronDown = ({ size = 10, ...p }: P) => (
-  <svg {...base(size)} {...p}><path d="m3.5 6 4.5 4.5L12.5 6" /></svg>
-);
-export const IconLeft = ({ size = 12, ...p }: P) => (
-  <svg {...base(size)} {...p}><path d="M10 3 5 8l5 5" /></svg>
-);
-export const IconRight = ({ size = 12, ...p }: P) => (
-  <svg {...base(size)} {...p}><path d="m6 3 5 5-5 5" /></svg>
-);
-export const IconSliders = ({ size = 14, ...p }: P) => (
-  <svg {...base(size)} {...p}><path d="M2 4.5h12M2 8h12M2 11.5h12" /><circle cx="5" cy="4.5" r="1.4" fill="var(--panel)" /><circle cx="10.5" cy="8" r="1.4" fill="var(--panel)" /><circle cx="7" cy="11.5" r="1.4" fill="var(--panel)" /></svg>
-);
-export const IconUsers = ({ size = 16, ...p }: P) => (
-  <svg {...base(size)} {...p}><circle cx="6" cy="5.5" r="2.3" /><path d="M1.8 13.5c.4-2.4 2.1-3.8 4.2-3.8s3.8 1.4 4.2 3.8" /><path d="M10.6 3.4a2.2 2.2 0 0 1 0 4.2M12.4 10c1 .6 1.6 1.9 1.8 3.5" /></svg>
-);
-export const IconPencil = ({ size = 14, ...p }: P) => (
-  <svg {...base(size)} {...p}><path d="M10.8 2.7a1.6 1.6 0 0 1 2.3 2.3L5.6 12.5 2.5 13.5l1-3.1z" /><path d="M9.6 3.9l2.5 2.5" /></svg>
-);
-export const IconArrowUp = ({ size = 14, ...p }: P) => (
-  <svg {...base(size)} strokeWidth={1.8} {...p}><path d="M8 13V3M3.8 7.2 8 3l4.2 4.2" /></svg>
-);
-export const IconTrash = ({ size = 14, ...p }: P) => (
-  <svg {...base(size)} {...p}><path d="M2.5 4.5h11M6 4.5V3h4v1.5M4 4.5l.7 9h6.6l.7-9" /></svg>
-);
-export const IconSplit = ({ size = 14, ...p }: P) => (
-  <svg {...base(size)} {...p}><rect x="2" y="2.5" width="12" height="11" rx="1.5" /><path d="M8 2.5v11" /></svg>
-);
-export const IconArrow = ({ size = 9, ...p }: P) => (
-  <svg {...base(size)} {...p}><path d="M2 8h11M9 4l4 4-4 4" /></svg>
-);
+/** One icon family (Phosphor, regular weight) so every glyph shares stroke, corner and optical size. */
+const mk = (Cmp: ComponentType<IconProps>, def: number, extra: Partial<IconProps> = {}) =>
+  function Icon({ size = def, style, className }: P) {
+    return <Cmp size={size} weight="regular" style={style} className={className} aria-hidden {...extra} />;
+  };
 
-export const IconTable = ({ size = 14 }: P) => (
-  <svg width={size} height={size} viewBox="0 0 16 16">
-    <rect x="1.5" y="2" width="13" height="12" rx="1.5" fill="#3d7ac2" />
-    <path d="M1.5 6h13M1.5 10h13M6 6v8M10.5 6v8" stroke="#bcd6f5" strokeWidth="1" />
-  </svg>
-);
-export const IconView = ({ size = 14 }: P) => (
-  <svg width={size} height={size} viewBox="0 0 16 16">
-    <circle cx="8" cy="8" r="6.5" fill="#9a5cc8" />
-    <path d="M3.5 8S5.3 5 8 5s4.5 3 4.5 3-1.8 3-4.5 3-4.5-3-4.5-3z" fill="none" stroke="#efdcff" strokeWidth="1" />
-    <circle cx="8" cy="8" r="1.2" fill="#efdcff" />
-  </svg>
-);
-export const IconFunction = ({ size = 14 }: P) => (
-  <svg width={size} height={size} viewBox="0 0 16 16">
-    <rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="#3f9b6a" />
-    <text x="8" y="11.6" textAnchor="middle" fontSize="9.5" fontStyle="italic" fontFamily="Georgia, serif" fill="#e2fff0">f</text>
-  </svg>
-);
-export const IconQuery = ({ size = 14 }: P) => (
-  <svg width={size} height={size} viewBox="0 0 16 16">
-    <rect x="2.5" y="1.5" width="11" height="13" rx="1.5" fill="#6f7782" />
-    <path d="M5 5h6M5 8h6M5 11h4" stroke="#e9edf2" strokeWidth="1" />
-  </svg>
+export const IconSearch = mk(MagnifyingGlass, 14);
+export const IconPlus = mk(Plus, 14);
+/** Ask AI is a conversation, so it gets a chat bubble rather than a sparkle. */
+export const IconChat = mk(ChatCircle, 14);
+export const IconCheck = mk(Check, 14, { weight: "bold" });
+export const IconCopy = mk(Copy, 14);
+export const IconPlay = mk(Play, 14);
+export const IconPalette = mk(Palette, 16);
+export const IconSortUp = mk(ArrowUp, 10, { weight: "bold" });
+export const IconSortDown = mk(ArrowDown, 10, { weight: "bold" });
+export const IconDot = mk(Circle, 8, { weight: "fill" });
+export const IconMinus = mk(Minus, 12);
+export const IconPlug = mk(Plugs, 16);
+export const IconClose = mk(X, 16);
+export const IconX = mk(X, 12);
+export const IconEye = mk(Eye, 16);
+export const IconList = mk(ListBullets, 16);
+export const IconLock = mk(Lock, 16);
+export const IconUnlock = mk(LockOpen, 16);
+export const IconDatabase = mk(Database, 16);
+export const IconChart = mk(ChartBar, 16);
+export const IconRefresh = mk(ArrowsClockwise, 16);
+export const IconMore = mk(DotsThree, 18, { weight: "bold" });
+export const IconSidebarLeft = mk(PhSidebar, 18);
+export const IconSidebarRight = mk(PhSidebar, 18, { mirrored: true });
+export const IconSidebarBottom = mk(SquareHalfBottom, 18);
+export const IconChevronDown = mk(CaretDown, 12);
+export const IconLeft = mk(CaretLeft, 14);
+export const IconRight = mk(CaretRight, 14);
+export const IconSliders = mk(SlidersHorizontal, 14);
+export const IconUsers = mk(UsersThree, 16);
+export const IconPencil = mk(PencilSimple, 14);
+export const IconArrowUp = mk(ArrowUp, 14, { weight: "bold" });
+export const IconTrash = mk(Trash, 14);
+export const IconSplit = mk(Columns, 14);
+export const IconArrow = mk(ArrowRight, 10);
+export const IconGear = mk(Gear, 16);
+export const IconTerminal = mk(Terminal, 16);
+export const IconShield = mk(ShieldCheck, 16);
+export const IconPower = mk(Power, 16);
+export const IconInfo = mk(Info, 16);
+export const IconFolder = mk(FolderSimple, 14);
+export const IconHistory = mk(ClockCounterClockwise, 14);
+export const IconBookmark = mk(BookmarkSimple, 14);
+export const IconCode = mk(Code, 14);
+
+/** Sidebar object icons are monochrome: the label and the active row carry the meaning, not a color. */
+export const IconTable = mk(Table, 14);
+export const IconView = mk(Eye, 14);
+export const IconFunction = mk(PhFunction, 14);
+export const IconQuery = mk(FileSql, 14);
+
+export const IconBox = ({ down, size = 16, ...p }: P & { down: boolean }) => {
+  const Cmp = down ? ArrowLineDown : ArrowLineUp;
+  return <Cmp size={size} weight="regular" aria-hidden {...p} />;
+};
+export const IconCube = mk(Cube, 16);
+
+export const IconChevron = ({ size = 12, open = false, style, className }: P & { open?: boolean }) => (
+  <CaretRight
+    size={size}
+    weight="bold"
+    aria-hidden
+    className={className}
+    style={{ transform: open ? "rotate(90deg)" : undefined, transition: "transform 150ms cubic-bezier(0.23, 1, 0.32, 1)", ...style }}
+  />
 );

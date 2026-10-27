@@ -3,8 +3,8 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import { api, errorText, type Filter, type ObjectList, type SessionInfo } from "../api";
 import {
-  IconClose, IconDatabase, IconEye, IconList, IconUsers, IconLock, IconPlug, IconRefresh, IconSearch,
-  IconMore, IconSparkle, IconSidebarBottom, IconSidebarLeft, IconSidebarRight, IconTrash, IconUnlock, IconX,
+  IconDatabase, IconEye, IconLeft, IconPlus, IconRefresh, IconRight, IconSearch, IconSidebarBottom, IconSidebarLeft, IconSidebarRight,
+  IconList, IconChat, IconTrash, IconX,
 } from "../components/icons";
 import { ContextMenu, DRIVERS, Modal, isMac, load, mod, save, tagColor, useToast, type MenuState } from "../components/ui";
 import { BackupDialog } from "../components/BackupDialog";
@@ -24,7 +24,6 @@ import "./workspace.css";
 type Tab =
   | { id: string; kind: "table"; schema: string; table: string; isView: boolean; preview: boolean; filters?: Filter[]; view?: "data" | "structure" }
   | { id: string; kind: "query"; title: string; sql: string; run?: boolean }
-  | { id: string; kind: "ai"; title: string }
   | { id: string; kind: "overview"; title: string }
   | { id: string; kind: "processes"; title: string }
   | { id: string; kind: "users"; title: string };
@@ -42,7 +41,7 @@ type Dialog =
 type SavedTab =
   | { kind: "table"; schema: string; table: string; view?: "data" | "structure" }
   | { kind: "query"; title: string; sql: string }
-  | { kind: "overview" | "processes" | "ai" | "users" };
+  | { kind: "overview" | "processes" | "ai" | "users" };  // "ai" is legacy: Ask AI now lives in the right sidebar
 
 interface LogEntry {
   at: Date;
@@ -60,7 +59,9 @@ export function Workspace({ sessionId }: { sessionId: string }) {
   const [objects, setObjects] = useState<ObjectList>({ tables: [], views: [], functions: [] });
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [panels, setPanels] = useState(() => load("querybird.panels", { left: true, bottom: true, right: true, leftW: 232, rightW: 300, bottomH: 120 }));
+  const [panels, setPanels] = useState(() => load("querybird.panels", { left: true, bottom: true, right: true, leftW: 248, rightW: 380, bottomH: 120 }));
+  const [rightTab, setRightTab] = useState<"ai" | "details">(() => load("querybird.rightTab", "ai"));
+  const [aiMounted, setAiMounted] = useState(rightTab === "ai");
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoadingCount] = useState(0);
   const [menu, setMenu] = useState<MenuState | null>(null);
@@ -83,6 +84,7 @@ export function Workspace({ sessionId }: { sessionId: string }) {
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
   useEffect(() => save("querybird.panels", panels), [panels]);
+  useEffect(() => save("querybird.rightTab", rightTab), [rightTab]);
 
   // ---------- bootstrap ----------
   useEffect(() => {
@@ -136,7 +138,7 @@ export function Workspace({ sessionId }: { sessionId: string }) {
         return [{ id: newId(), kind: "table", schema: t.schema, table: t.table, isView: objects.views.includes(t.table), preview: false, view: t.view }];
       }
       if (t.kind === "query") return [{ id: newId(), kind: "query", title: t.title, sql: t.sql }];
-      if (t.kind === "ai") return [{ id: newId(), kind: "ai", title: "Ask AI" }];
+      if (t.kind === "ai") return [];
       if (t.kind === "users") return [{ id: newId(), kind: "users", title: "Users" }];
       return [t.kind === "overview" ? { id: newId(), kind: "overview", title: "Item overview" } : { id: newId(), kind: "processes", title: "Processes" }];
     });
@@ -277,6 +279,8 @@ export function Workspace({ sessionId }: { sessionId: string }) {
     const i = tabs.findIndex((t) => t.id === activeId);
     if (tabs.length) activate(tabs[(i + d + tabs.length) % tabs.length].id);
   };
+  /** Cmd+J: hide the side panel if it is already showing Ask AI, otherwise open it on Ask AI. */
+  const toggleAi = () => (panels.right && rightTab === "ai" ? setPanels((p) => ({ ...p, right: false })) : openAi());
   const commands: Record<string, () => void> = {
     settings: () => setDialog({ kind: "settings" }),
     new_connection: () => {
@@ -301,7 +305,7 @@ export function Workspace({ sessionId }: { sessionId: string }) {
     find: () => (active?.kind === "query" ? activeApi()?.find?.() : activeApi()?.toggleFilters?.()),
     toggle_sidebar: () => setPanels((p) => ({ ...p, left: !p.left })),
     toggle_console: () => setPanels((p) => ({ ...p, bottom: !p.bottom })),
-    toggle_details: () => setPanels((p) => ({ ...p, right: !p.right })),
+    toggle_details: () => (panels.right && rightTab === "details" ? setPanels((p) => ({ ...p, right: false })) : (setRightTab("details"), setPanels((p) => ({ ...p, right: true })))),
     font_bigger: () => bumpFont(1),
     font_smaller: () => bumpFont(-1),
     open_anything: () => setAnything(true),
@@ -321,7 +325,7 @@ export function Workspace({ sessionId }: { sessionId: string }) {
     new_user: () => (info?.connection.driver === "sqlite" ? toast.show("SQLite databases have no users") : openSpecial("users")),
     processes: () => (info?.connection.driver === "sqlite" ? toast.show("SQLite has no server processes") : openSpecial("processes")),
     search_db: () => setDialog({ kind: "search" }),
-    ask_ai: () => openSpecial("ai"),
+    ask_ai: toggleAi,
   };
   // A shortcut can arrive both as a keydown and as a menu event; run it once.
   const run = (id: string, source: "key" | "menu") => {
@@ -418,17 +422,24 @@ export function Workspace({ sessionId }: { sessionId: string }) {
     }
   };
 
+  /** Ask AI is a right-sidebar panel, not a tab. */
+  const openAi = () => {
+    setAiMounted(true);
+    setRightTab("ai");
+    setPanels((p) => ({ ...p, right: true }));
+    setTimeout(() => window.dispatchEvent(new Event("querybird:focus-ai")), 0);
+  };
+
   const openSpecial = (kind: "overview" | "processes" | "ai" | "users") => {
+    if (kind === "ai") return openAi();
     const existing = tabs.find((t) => t.kind === kind);
     if (existing) return activate(existing.id);
     const tab: Tab =
       kind === "overview"
         ? { id: newId(), kind, title: "Item overview" }
-        : kind === "ai"
-          ? { id: newId(), kind, title: "Ask AI" }
-          : kind === "users"
-            ? { id: newId(), kind, title: "Users" }
-            : { id: newId(), kind, title: "Processes" };
+        : kind === "users"
+          ? { id: newId(), kind, title: "Users" }
+          : { id: newId(), kind, title: "Processes" };
     setTabs([...tabs, tab]);
     activate(tab.id);
   };
@@ -436,7 +447,7 @@ export function Workspace({ sessionId }: { sessionId: string }) {
   const moreMenu = (e: React.MouseEvent) => {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     setMenu({
-      x: r.right - 220,
+      x: Math.max(8, r.left),
       y: r.bottom + 4,
       items: [
         { label: "Reconnect", onClick: reconnect },
@@ -445,7 +456,7 @@ export function Workspace({ sessionId }: { sessionId: string }) {
         { label: "Item overview", onClick: () => openSpecial("overview") },
         { label: "Search in Database…", onClick: () => setDialog({ kind: "search" }) },
         ...(info?.connection.driver !== "sqlite" ? [{ label: "Process List", onClick: () => openSpecial("processes") }] : []),
-        { label: "Ask AI (natural language → SQL)", kbd: `${mod}J`, onClick: () => openSpecial("ai") },
+        { label: "Ask AI", kbd: `${mod}J`, onClick: toggleAi },
         ...(info?.connection.driver !== "sqlite" ? [{ label: "User Management", onClick: () => openSpecial("users") }] : []),
         { separator: true },
         { label: "Open SQL file…", kbd: `${mod}O`, onClick: openSqlFile },
@@ -529,51 +540,30 @@ export function Workspace({ sessionId }: { sessionId: string }) {
       <div className="ws">
         <div className="toolbar" data-tauri-drag-region style={toolbarStyle}>
           <div className="toolbar-group" style={{ paddingLeft: isMac ? 76 : 8 }} data-tauri-drag-region>
-            <button className="icon-btn" title="Open connection list" onClick={() => api.showWelcome()}><IconPlug /></button>
-            <button className="icon-btn" title="Close connection" onClick={() => getCurrentWindow().close()}><IconClose /></button>
-            <button className="icon-btn" title="Preview pending changes" disabled={!(active && pending[active.id] > 0)} onClick={() => activeApi()?.preview?.()}><IconEye /></button>
-            {c.driver !== "sqlite" && (
-              <>
-                <button className="icon-btn" title="Process list" onClick={() => openSpecial("processes")}>
-                  <IconList />
-                </button>
-                <button className="icon-btn" title="Users — create users, change passwords, grant access" onClick={() => openSpecial("users")}>
-                  <IconUsers />
-                </button>
-              </>
-            )}
-            <button className={`icon-btn${safeMode ? " on" : ""}`} title={safeMode ? "Safe mode ON — writes need confirmation" : "Safe mode OFF"} onClick={() => setSafeMode((s) => !s)}>
-              {safeMode ? <IconLock /> : <IconUnlock />}
-            </button>
-            <button className="icon-btn" title={`Switch ${c.driver === "mysql" ? "database" : "schema"}`} onClick={() => setSchemaPicker(true)}><IconDatabase /></button>
-            <button className="icon-btn sql-btn" title={`New SQL query (${mod}T)`} onClick={() => openQuery("")}>SQL</button>
-            <button className="icon-btn ai-btn" title={`Ask AI — natural language to SQL (${mod}J)`} onClick={() => openSpecial("ai")}>
-              <IconSparkle /> AI
-            </button>
+            <button className={`icon-btn${panels.left ? " on" : ""}`} title={`${panels.left ? "Hide" : "Show"} sidebar (${mod}0)`} onClick={() => setPanels((p) => ({ ...p, left: !p.left }))}><IconSidebarLeft /></button>
           </div>
           <div className="crumb" data-tauri-drag-region>
             <span className="crumb-tag" style={{ color: tagColor(c.tag) }} data-tauri-drag-region>{c.tag.toUpperCase()}</span>
-            <span className="crumb-sep" data-tauri-drag-region>|</span>
+            <span className="crumb-sep" data-tauri-drag-region>/</span>
             <span className="crumb-text" data-tauri-drag-region>
-              {driverLabel} {shortVersion} : {c.name} : {c.database || schema} : {crumb}
+              {c.name} <span className="crumb-dim">· {driverLabel} {shortVersion}</span> <span className="crumb-sep">/</span> {c.database || schema} <span className="crumb-sep">/</span> <b>{crumb}</b>
             </span>
             {loading > 0 && <span className="crumb-progress" />}
           </div>
           <div className="toolbar-group" data-tauri-drag-region>
             {totalPending > 0 && (
               <div className="pending-pill">
-                <span>{totalPending} change{totalPending === 1 ? "" : "s"}</span>
+                <span>{totalPending} unsaved</span>
+                <button className="btn small" title="Preview the SQL for these changes" onClick={() => activeApi()?.preview?.()}><IconEye size={13} /> Preview</button>
                 <button className="btn small" onClick={() => activeApi()?.discard?.()}>Discard</button>
                 <button className="btn small primary" onClick={() => activeApi()?.commit?.()}>Commit {mod}S</button>
               </div>
             )}
+            <button className="icon-btn" title={`Search tables & queries (${mod}P)`} onClick={() => setAnything(true)}><IconSearch size={15} /></button>
             <button className="icon-btn" title={`Reload (${mod}R)`} onClick={() => activeApi()?.reload?.() ?? refreshObjects()}><IconRefresh /></button>
-            <button className="icon-btn" title={`Open anything (${mod}P)`} onClick={() => setAnything(true)}><IconSearch size={15} /></button>
-            <button className="icon-btn" title="More: overview, search, import / export, backup, settings" onClick={moreMenu}><IconMore /></button>
-            <span style={{ width: 8 }} />
-            <button className={`icon-btn${panels.left ? " on" : ""}`} title={`Toggle sidebar (${mod}0)`} onClick={() => setPanels((p) => ({ ...p, left: !p.left }))}><IconSidebarLeft /></button>
-            <button className={`icon-btn${panels.bottom ? " on" : ""}`} title={`Toggle console (${mod}⇧E)`} onClick={() => setPanels((p) => ({ ...p, bottom: !p.bottom }))}><IconSidebarBottom /></button>
-            <button className={`icon-btn${panels.right ? " on" : ""}`} title={`Toggle details (${mod}⇧.)`} onClick={() => setPanels((p) => ({ ...p, right: !p.right }))}><IconSidebarRight /></button>
+            <span className="toolbar-sep" />
+            <button className={`icon-btn${panels.bottom ? " on" : ""}`} title={`${panels.bottom ? "Hide" : "Show"} query log (${mod}⇧E)`} onClick={() => setPanels((p) => ({ ...p, bottom: !p.bottom }))}><IconSidebarBottom /></button>
+            <button className={`icon-btn${panels.right ? " on" : ""}`} title={`${panels.right ? "Hide" : "Show"} side panel (${mod}⇧.)`} onClick={() => setPanels((p) => ({ ...p, right: !p.right }))}><IconSidebarRight /></button>
           </div>
         </div>
 
@@ -601,6 +591,35 @@ export function Workspace({ sessionId }: { sessionId: string }) {
                   onImportCsv={(table) => setDialog({ kind: "importCsv", table })}
                   onImportSql={() => setDialog({ kind: "importSql" })}
                   onOverview={() => openSpecial("overview")}
+                  nav={{
+                    name: c.name,
+                    tag: c.tag,
+                    meta: `${driverLabel} ${shortVersion}`,
+                    color: safeColor,
+                    safeMode,
+                    pendingTotal: totalPending,
+                    onSafeMode: () => setSafeMode((x) => !x),
+                    onNewQuery: () => openQuery(""),
+                    onAsk: openAi,
+                    onProcesses: () => openSpecial("processes"),
+                    onUsers: () => openSpecial("users"),
+                    onSearchDb: () => setDialog({ kind: "search" }),
+                    onSettings: () => setDialog({ kind: "settings" }),
+                    onMore: moreMenu,
+                    onConnection: (e) => {
+                      const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                      setMenu({
+                        x: r.left,
+                        y: r.bottom + 4,
+                        items: [
+                          { label: "All connections…", onClick: () => api.showWelcome() },
+                          { label: "Reconnect", onClick: reconnect },
+                          { separator: true },
+                          { label: "Close this connection", danger: true, onClick: () => getCurrentWindow().close() },
+                        ],
+                      });
+                    },
+                  }}
                 />
               </div>
               <div className="splitter-v" onMouseDown={drag("leftW")} />
@@ -614,13 +633,13 @@ export function Workspace({ sessionId }: { sessionId: string }) {
                 let id = h.back.pop();
                 while (id && !tabs.some((t) => t.id === id)) id = h.back.pop();
                 if (id) { if (activeId) h.fwd.push(activeId); setActiveId(id); }
-              }}>‹</button>
+              }}><IconLeft /></button>
               <button className="icon-btn" disabled={!navHistory.current.fwd.length} title="Go forward" onClick={() => {
                 const h = navHistory.current;
                 let id = h.fwd.pop();
                 while (id && !tabs.some((t) => t.id === id)) id = h.fwd.pop();
                 if (id) { if (activeId) h.back.push(activeId); setActiveId(id); }
-              }}>›</button>
+              }}><IconRight /></button>
               <div className="tabs">
                 {tabs.map((t) => (
                   <div
@@ -644,23 +663,17 @@ export function Workspace({ sessionId }: { sessionId: string }) {
                     title={t.kind === "table" ? `${t.schema}.${t.table}` : t.title}
                   >
                     <button className="tab-close" onMouseDown={(e) => e.stopPropagation()} onClick={() => closeTab(t.id)}><IconX /></button>
-                    <span className="tab-title">{pending[t.id] > 0 ? "● " : ""}{t.kind === "table" ? t.table : t.title}</span>
+                    <span className="tab-title">{pending[t.id] > 0 && <span className="tab-dot" />}{t.kind === "table" ? t.table : t.title}</span>
                   </div>
                 ))}
               </div>
+              <button className="icon-btn" title={`New SQL query (${mod}T)`} onClick={() => openQuery("")}><IconPlus size={14} /></button>
             </div>
 
             <div className="tab-area">
               {tabs.map((t) => (
                 <div key={t.id} className="tab-pane" style={{ display: t.id === activeId ? "flex" : "none" }}>
-                  {t.kind === "ai" ? (
-                    <AskTab
-                      active={t.id === activeId}
-                      onDetails={(d) => setDetails((x) => ({ ...x, [t.id]: d }))}
-                      register={(a) => (tabApis.current[t.id] = a)}
-                      onOpenSettings={() => setDialog({ kind: "settings", tab: "ai" })}
-                    />
-                  ) : t.kind === "overview" ? (
+                  {t.kind === "overview" ? (
                     <OverviewTab register={(a) => (tabApis.current[t.id] = a)} />
                   ) : t.kind === "processes" ? (
                     <ProcessTab register={(a) => (tabApis.current[t.id] = a)} />
@@ -735,14 +748,29 @@ export function Workspace({ sessionId }: { sessionId: string }) {
             )}
           </div>
 
-          {panels.right && (
-            <>
-              <div className="splitter-v" onMouseDown={drag("rightW")} />
-              <div style={{ width: panels.rightW, flex: "none", display: "flex" }}>
+          {panels.right && <div className="splitter-v" onMouseDown={drag("rightW")} />}
+          <div className="side-panel" style={{ width: panels.rightW, display: panels.right ? "flex" : "none" }}>
+            <div className="side-tabs" role="tablist">
+              <button role="tab" aria-selected={rightTab === "ai"} className={rightTab === "ai" ? "active" : ""} onClick={openAi}>
+                <IconChat size={14} /> Ask AI
+              </button>
+              <button role="tab" aria-selected={rightTab === "details"} className={rightTab === "details" ? "active" : ""} onClick={() => setRightTab("details")}>
+                <IconList size={14} /> Row details
+              </button>
+              <span className="spacer" />
+              <button className="icon-btn" title="Close side panel" onClick={() => setPanels((p) => ({ ...p, right: false }))}><IconX /></button>
+            </div>
+            {aiMounted && (
+              <div className="side-body" style={{ display: rightTab === "ai" ? "flex" : "none" }}>
+                <AskTab active={panels.right && rightTab === "ai"} onOpenSettings={() => setDialog({ kind: "settings", tab: "ai" })} />
+              </div>
+            )}
+            {rightTab === "details" && (
+              <div className="side-body">
                 <DetailsPanel details={activeId ? details[activeId] ?? null : null} />
               </div>
-            </>
-          )}
+            )}
+          </div>
         </div>
 
         <ContextMenu menu={menu} onClose={() => setMenu(null)} />

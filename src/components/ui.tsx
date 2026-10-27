@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { Driver } from "../api";
+import { IconCheck, IconRight } from "./icons";
 
 export function Modal({
   title,
@@ -43,6 +44,8 @@ export interface MenuItem {
   separator?: boolean;
   onClick?: () => void;
   submenu?: MenuItem[];
+  /** Shows a check mark (current choice). */
+  checked?: boolean;
 }
 
 export interface MenuState {
@@ -101,9 +104,10 @@ function MenuList({ items, onClose }: { items: MenuItem[]; onClose: () => void }
               it.onClick?.();
             }}
           >
+            {it.checked !== undefined && <span className="check">{it.checked && <IconCheck size={13} />}</span>}
             <span>{it.label}</span>
             {it.kbd && <span className="kbd">{it.kbd}</span>}
-            {it.submenu && <span className="kbd">▸</span>}
+            {it.submenu && <span className="kbd"><IconRight size={10} /></span>}
             {it.submenu && open === i && (
               <div className="ctx ctx-sub">
                 <MenuList items={it.submenu} onClose={onClose} />

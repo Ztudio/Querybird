@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { IconX } from "../components/icons";
 import { Modal } from "../components/ui";
 import { api, errorText, type AccessLevel, type DbUser, type QueryResult, type UserAction, type UserSpec } from "../api";
 import { DataGrid, type GridSelection } from "./DataGrid";
@@ -533,7 +534,7 @@ export function UsersTab({ register }: { register: (a: TabApi) => void }) {
                         {selected.memberOf.map((r) => (
                           <span key={r} className="users-tag big">
                             {r}
-                            <button title={`Remove from ${r}`} onClick={() => ask(`Remove ${selected.name} from ${r}`, { action: "membership", name: selected.name, role: r, revoke: true }, true)}>×</button>
+                            <button title={`Remove from ${r}`} onClick={() => ask(`Remove ${selected.name} from ${r}`, { action: "membership", name: selected.name, role: r, revoke: true }, true)}><IconX size={11} /></button>
                           </span>
                         ))}
                         <span className="spacer" />

@@ -189,7 +189,7 @@ export function ConnectionForm({
                 style={{
                   width: 24,
                   height: 22,
-                  borderRadius: 5,
+                  borderRadius: 6,
                   border: c.color === col ? "2px solid var(--accent)" : "1px solid var(--control-border)",
                   background: col || "var(--control)",
                 }}
