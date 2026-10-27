@@ -7,34 +7,24 @@ no trial and no account. Ever.
 Runs on macOS, Windows and Linux. Built-in **[Ask AI](#ask-ai)** turns plain-language questions into SQL
 with Claude or OpenAI.
 
-![Ask AI: a plain-language question turned into SQL, with the result grid](docs/ask-ai.jpg)
+![The Querybird workspace with the Ask AI panel](docs/workspace.jpg)
 
 <table>
   <tr>
-    <td><img src="docs/table-details.jpg" alt="Browsing a table with filters and the row details panel"></td>
-    <td><img src="docs/sql-editor.jpg" alt="SQL editor with multiple result sets"></td>
+    <td><img src="docs/welcome-screen.jpg" alt="Connection list and the welcome window"></td>
   </tr>
   <tr>
-    <td align="center">Data grid, filters and row details</td>
-    <td align="center">SQL editor with multiple result sets</td>
-  </tr>
-  <tr>
-    <td><img src="docs/pending-edits.jpg" alt="Editing rows with pending changes"></td>
-    <td><img src="docs/welcome.jpg" alt="Connection list"></td>
-  </tr>
-  <tr>
-    <td align="center">Edits stay pending until you commit</td>
     <td align="center">Connection list</td>
   </tr>
 </table>
 
 ## Download
 
-Installers for the current version are in [`downloads/`](downloads/):
+The current version is **0.2.0**. Its macOS installer is on the [release page](https://github.com/Ztudio/Querybird/releases/tag/v0.2.0). The Windows and Ubuntu installers (0.1.0) are in [`downloads/`](downloads/) until the next release:
 
 | Platform | File | SHA-256 |
 | --- | --- | --- |
-| macOS (Apple Silicon + Intel) | [Querybird_0.1.0_universal.dmg](downloads/Querybird_0.1.0_universal.dmg) | `e3cc1da71c7964423b9e995e4a7fc3d32327a9396f56bc608bb32e226fba7404` |
+| macOS 0.2.0 (Apple Silicon + Intel) | [Querybird_0.2.0_universal.dmg](https://github.com/Ztudio/Querybird/releases/download/v0.2.0/Querybird_0.2.0_universal.dmg) | `d8a0f08938b6c238c294533c5b023133fc337ea552a16a60b19d97bbd4e0fdc2` |
 | Windows 10/11 (x64) | [Querybird_0.1.0_x64-setup.exe](downloads/Querybird_0.1.0_x64-setup.exe) | `aeea394b81a0e5411928ddf536c128a6bd857781db1c6bef8259d1c38cab82da` |
 | Ubuntu / Debian (x64) | [Querybird_0.1.0_amd64.deb](downloads/Querybird_0.1.0_amd64.deb) | `3f4185cdcd5017ea2793b2a04261a3c6a76478fe3c096e528257fdcf7ed65ba6` |
 
@@ -86,6 +76,10 @@ Releases are built by GitHub Actions on each `v*` tag (`.github/workflows/releas
 
 **Ask AI** — natural language → SQL with Claude or OpenAI; see [Ask AI](#ask-ai) below.
 
+**Look**
+- Six themes (Ember, Light, Monokai, Catppuccin Latte, Solarized Light, Vellum) or match the system; switch from the palette button in the sidebar or Settings
+- Geist and Geist Mono fonts, Phosphor icons, and tooltips that show the shortcut
+
 **Safety**
 - Safe mode (lock icon): every write needs confirmation. On by default for connections tagged `production`
 - Console log of every statement Querybird runs
@@ -95,11 +89,12 @@ Releases are built by GitHub Actions on each `v*` tag (`.github/workflows/releas
 Ask your database a question in plain language and Querybird writes the SQL, shows it to you, runs it and
 displays the result — all inside the same workspace window.
 
-- Click **AI** next to **SQL** in the toolbar (⌘J / Ctrl+J) to open an Ask AI tab, then type a question or
-  pick one of the suggestions
-- Every answer shows the question, the model's explanation, the generated SQL, the model used, timings and the
-  result grid. **Run again**, **Open in SQL Editor** or **Copy SQL** to keep working with it
-- Follow-up questions in the same tab see the earlier questions and SQL, so you can refine step by step
+- The **Ask AI** panel sits on the right of the workspace. Open it from the sidebar or with ⌘J (Ctrl+J); the same
+  shortcut hides it again. Type a question or pick one of the suggestions
+- Every answer shows the model's reply, the generated SQL, the model used, timings and the result grid. Icon buttons
+  under the answer run it again, open it in the editor, copy the SQL or show what was sent
+- **Read rows** (off by default) sends up to 50 rows of a read-only result so the model can write a conclusion from them
+- Follow-up questions in the same panel see the earlier questions, replies and SQL, so you can refine step by step
 - "Fix with AI" retries with the database error when a statement fails
 - Every generated statement is written to the console log and query history
 
@@ -125,8 +120,8 @@ API keys and sign-in tokens are stored in the OS keychain. Querybird itself is f
   first — for `DELETE`/`UPDATE` a read-only `COUNT(*)` of the rows it would touch, without running the statement —
   and `DROP`, `TRUNCATE`, destructive `ALTER`s, `DELETE`/`UPDATE` without `WHERE` or over 1,000 rows need an
   explicit "I understand" tick. Cancel has keyboard focus, so Enter never runs a write
-- Only your question and the schema (table/column names, types, keys) are sent — never row data
-- **What was sent** shows the exact prompt and schema context sent to the model
+- Only your question and the schema (table/column names, types, keys) are sent. Result rows go out only when **Read rows** is on
+- **What was sent** shows the exact prompt, schema context and any rows sent to the model
 
 ![The exact context sent to the model](docs/ai-context.jpg)
 ![AI settings](docs/ai-settings.jpg)
@@ -145,7 +140,7 @@ API keys and sign-in tokens are stored in the OS keychain. Querybird itself is f
 | Delete selected rows | ⌘⌫ | Ctrl+Backspace / Delete |
 | Run current / all statements | ⌘↵ / ⌘⇧↵ | Ctrl+Enter / Ctrl+Shift+Enter |
 | Beautify SQL | ⌘I (in editor) | Ctrl+I |
-| Open Ask AI tab | ⌘J | Ctrl+J |
+| Toggle the Ask AI panel | ⌘J | Ctrl+J |
 | Previous / next tab | ⌘⇧[ / ⌘⇧] | Ctrl+Shift+[ / ] |
 | Toggle sidebar / console / details | ⌘0 / ⌘⇧E / ⌘⇧. | Ctrl+0 / Ctrl+Shift+E / Ctrl+Shift+. |
 
@@ -192,6 +187,11 @@ See [PARITY.md](PARITY.md) for a feature-by-feature comparison with TablePlus.
 ## Roadmap
 
 SQLite / Redis / other drivers, split panes, triggers editor, ER diagrams, passcode lock.
+
+## Support
+
+If Querybird saves you time, you can [buy the maintainer a coffee](https://buymeacoffee.com/ztudio).
+Querybird stays free either way.
 
 ## License
 
