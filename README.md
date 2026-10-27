@@ -7,6 +7,10 @@ no trial and no account. Ever.
 Runs on macOS, Windows and Linux. Built-in **[Ask AI](#ask-ai)** turns plain-language questions into SQL
 with Claude or OpenAI.
 
+<p align="center">
+  <a href="https://buymeacoffee.com/ztudio"><img src="docs/buy-me-a-coffee.png" alt="Buy me a coffee" height="50"></a>
+</p>
+
 ![The Querybird workspace with the Ask AI panel](docs/workspace.jpg)
 
 <table>
@@ -190,8 +194,11 @@ SQLite / Redis / other drivers, split panes, triggers editor, ER diagrams, passc
 
 ## Support
 
-If Querybird saves you time, you can [buy the maintainer a coffee](https://buymeacoffee.com/ztudio).
-Querybird stays free either way.
+If Querybird saves you time, you can buy the maintainer a coffee. Querybird stays free either way.
+
+<p align="center">
+  <a href="https://buymeacoffee.com/ztudio"><img src="docs/buy-me-a-coffee.png" alt="Buy me a coffee" height="60"></a>
+</p>
 
 ## License
 
