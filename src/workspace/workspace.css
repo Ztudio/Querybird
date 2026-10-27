@@ -307,7 +307,8 @@
 .ask-expl { color: var(--text); line-height: 1.5; white-space: pre-wrap; user-select: text; -webkit-user-select: text; }
 .ask-sql { margin: 0; padding: 10px 12px; background: var(--input); border: 1px solid var(--border-soft); border-radius: var(--r-md); white-space: pre-wrap; user-select: text; -webkit-user-select: text; max-height: 240px; overflow: auto; overscroll-behavior: contain; font-size: 12px; line-height: 1.5; }
 .ask-error { color: var(--red); white-space: pre-wrap; font-family: var(--font-mono); font-size: 12px; user-select: text; -webkit-user-select: text; }
-.ask-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.ask-meta { display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.ask-meta > .faint { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ask-badge { color: var(--orange); border: 1px solid currentColor; border-radius: var(--r-xs); padding: 0 5px; font-size: 10.5px; }
 
 /* Waiting + streaming */
@@ -528,3 +529,7 @@
 .theme-swatch b { position: absolute; left: 36%; top: 22px; width: 44px; height: 4px; border-radius: 2px; opacity: 0.55; }
 .theme-swatch-system { background: linear-gradient(115deg, #151110 50%, #f9f9fa 50%); border-color: var(--border-soft); }
 .theme-swatch-system > span { display: none; }
+
+/* Summary of the rows, written only when the engineer asks for it. */
+.ask-summary { display: grid; gap: 6px; padding: 10px 12px; border-radius: var(--r-md); background: color-mix(in srgb, var(--text) 4%, transparent); }
+.ask-summary-label { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-3); }

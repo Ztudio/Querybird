@@ -28,6 +28,8 @@ export interface Settings {
   chatgptModel: string;
   /** Run generated read-only SQL immediately; writes always ask first. */
   aiAutoRun: boolean;
+  /** Send up to 50 rows of each read-only result to the AI for a written conclusion. Off by default. */
+  aiReadRows: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -51,6 +53,7 @@ export const DEFAULT_SETTINGS: Settings = {
   chatgptModel: "",
   codexModel: "",
   aiAutoRun: true,
+  aiReadRows: false,
 };
 
 const KEY = "querybird.settings";

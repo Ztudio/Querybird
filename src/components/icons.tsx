@@ -1,6 +1,6 @@
 import type { CSSProperties, ComponentType } from "react";
 import {
-  ArrowRight, ArrowUp, ArrowDown, Check, ChatCircle, Circle, Palette, ArrowLineDown, ArrowLineUp, CaretDown, CaretLeft, CaretRight, ChartBar, Code, Cube, Database, DotsThree,
+  ArrowRight, ArrowUp, ArrowDown, Check, Copy, Play, ChatCircle, Circle, Palette, ArrowLineDown, ArrowLineUp, CaretDown, CaretLeft, CaretRight, ChartBar, Code, Cube, Database, DotsThree,
   Eye, Function as PhFunction, Gear, ListBullets, Lock, LockOpen, MagnifyingGlass, Minus, PencilSimple, Plugs, Plus,
   ArrowsClockwise, SlidersHorizontal, SquareHalfBottom, Table, Terminal, Trash, UsersThree, X, Columns, FileSql,
   ClockCounterClockwise, BookmarkSimple, ShieldCheck, Power, Info, SidebarSimple as PhSidebar, FolderSimple,
@@ -20,6 +20,8 @@ export const IconPlus = mk(Plus, 14);
 /** Ask AI is a conversation, so it gets a chat bubble rather than a sparkle. */
 export const IconChat = mk(ChatCircle, 14);
 export const IconCheck = mk(Check, 14, { weight: "bold" });
+export const IconCopy = mk(Copy, 14);
+export const IconPlay = mk(Play, 14);
 export const IconPalette = mk(Palette, 16);
 export const IconSortUp = mk(ArrowUp, 10, { weight: "bold" });
 export const IconSortDown = mk(ArrowDown, 10, { weight: "bold" });

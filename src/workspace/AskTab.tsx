@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, errorText, type AiAnswer, type AiStatus, type ChatGptStatus, type CodexModels, type QueryResult } from "../api";
 import { Modal } from "../components/ui";
-import { IconArrowUp, IconChevronDown, IconPlus, IconChat } from "../components/icons";
+import { IconArrowUp, IconChat, IconChevronDown, IconCopy, IconInfo, IconPlay, IconPlus, IconQuery, IconRefresh } from "../components/icons";
 import { CLAUDE_MODELS, MANAGE_USAGE_URL, activeModel, aiReady, autoPickLocalCli, getSettings, updateSettings, useSettings, type Settings } from "../lib/settings";
 import { ChatGptWelcome } from "../components/SettingsModal";
 import { isReadOnly, writeRisk } from "../lib/sql";
@@ -22,6 +22,24 @@ interface Turn {
   runMs?: number;
   /** Just arrived: reveal it progressively once. */
   fresh?: boolean;
+  /** A conclusion drawn from the rows, only when the engineer asked for one. */
+  summary?: { status: "asking" | "done" | "error"; text?: string; error?: string; sent: string };
+}
+
+/** The rows an engineer chooses to share: a capped, tab-separated sample of the result. */
+function sampleText(res: QueryResult): { text: string; shown: number } {
+  const MAX_ROWS = 50;
+  const MAX_CHARS = 12000;
+  const head = res.columns.map((c) => c.name).join("\t");
+  const lines: string[] = [];
+  let chars = head.length;
+  for (const row of res.rows.slice(0, MAX_ROWS)) {
+    const line = row.map((v) => (v === null ? "NULL" : v.length > 200 ? `${v.slice(0, 200)}…` : v.replace(/[\t\r\n]+/g, " "))).join("\t");
+    if (chars + line.length > MAX_CHARS) break;
+    lines.push(line);
+    chars += line.length;
+  }
+  return { text: [head, ...lines].join("\n"), shown: lines.length };
 }
 
 interface Source {
@@ -43,7 +61,8 @@ export function AskTab({ active, onOpenSettings }: { active: boolean; onOpenSett
   const [status, setStatus] = useState<AiStatus | null>(null);
   const [gpt, setGpt] = useState<ChatGptStatus | null>(null);
   const [confirm, setConfirm] = useState<Turn | null>(null);
-  const [context, setContext] = useState<Turn | null>(null);
+  const [contextId, setContextId] = useState<number | null>(null);
+  const context = turns.find((t) => t.id === contextId) ?? null;
   const input = useRef<HTMLTextAreaElement>(null);
   const log = useRef<HTMLDivElement>(null);
 
@@ -152,6 +171,7 @@ export function AskTab({ active, onOpenSettings }: { active: boolean; onOpenSett
       const last = [...res].reverse().find((r) => r.columns.length) ?? res[res.length - 1];
       update(turn.id, { status: "done", result: last, runMs: performance.now() - started });
       if (writes) window.dispatchEvent(new Event("querybird:refresh-objects"));
+      if (!writes && getSettings().aiReadRows && last?.columns.length) summarize({ ...turn, result: last });
     } catch (e) {
       update(turn.id, { status: "error", runError: errorText(e), runMs: performance.now() - started });
     } finally {
@@ -171,10 +191,7 @@ export function AskTab({ active, onOpenSettings }: { active: boolean; onOpenSett
     setSelected(turn.id);
     if (!fixing) setQuestion("");
     stick.current = true;
-    const history = turns
-      .filter((t) => t.answer)
-      .slice(-6)
-      .map((t) => ({ question: t.question, sql: t.answer!.sql, explanation: t.answer!.explanation, error: t.runError ?? null }));
+    const history = historyForAi();
     const started = performance.now();
     try {
       const s = getSettings();
@@ -195,6 +212,35 @@ export function AskTab({ active, onOpenSettings }: { active: boolean; onOpenSett
     }
   };
 
+  const historyForAi = () =>
+    turns
+      .filter((t) => t.answer)
+      .slice(-6)
+      .map((t) => ({ question: t.question, sql: t.answer!.sql, reply: t.answer!.reply, error: t.runError ?? null }));
+
+  /** Opt-in: sends the rows shown in the grid so the AI can write a conclusion from them. */
+  const summarize = async (turn: Turn) => {
+    if (!turn.result?.columns.length) return;
+    const { text, shown } = sampleText(turn.result);
+    const sent = `Rows sent: ${shown} of ${turn.result.rows.length}\n${text}`;
+    update(turn.id, { summary: { status: "asking", sent } });
+    try {
+      const s = getSettings();
+      const answer = await api.aiAsk(ws.sessionId, {
+        provider: s.aiProvider,
+        claudeAuth: s.claudeAuth,
+        openaiAuth: s.openaiAuth,
+        model: activeModel(s),
+        question: turn.question,
+        history: historyForAi(),
+        results: sent,
+      });
+      update(turn.id, { summary: { status: "done", text: answer.reply, sent } });
+    } catch (e) {
+      update(turn.id, { summary: { status: "error", error: errorText(e), sent } });
+    }
+  };
+
   const current = turns.find((t) => t.id === selected) ?? null;
   const result = current?.result;
 
@@ -208,7 +254,7 @@ export function AskTab({ active, onOpenSettings }: { active: boolean; onOpenSett
               <div className="ask-empty-title">Ask your database in plain language</div>
               <div className="faint">
                 Ask for data and the AI writes the SQL, which you see before it runs. Ask about the schema and it answers in plain text. Only the schema
-                ({plural(ws.objects.tables.length, "table")}, {plural(ws.objects.views.length, "view")} in <b>{ws.schema}</b>) is sent — never your data.
+                ({plural(ws.objects.tables.length, "table")}, {plural(ws.objects.views.length, "view")} in <b>{ws.schema}</b>) is sent. Result rows go out only when “Read rows” is on.
               </div>
               <div className="ask-examples">
                 {["Top 10 customers by total order value", "How many orders per status this month?", "Products that are out of stock but still active"].map((ex) => (
@@ -275,16 +321,32 @@ export function AskTab({ active, onOpenSettings }: { active: boolean; onOpenSett
                           <span className="spacer" />
                           {t.answer.sql && (
                             <>
-                              <button className="btn small" onClick={(e) => (e.stopPropagation(), run(t))}>{t.result || t.runError ? "Run again" : "Run"}</button>
-                              <button className="btn small" onClick={(e) => (e.stopPropagation(), ws.openQuery(`-- ${t.question.replace(/\n/g, " ")}\n${t.answer!.sql};\n`, "AI query"))}>Open in editor</button>
-                              <button className="btn small" onClick={(e) => (e.stopPropagation(), navigator.clipboard.writeText(t.answer!.sql), ws.toast("SQL copied"))}>Copy</button>
+                              <button className="icon-btn" title={t.result || t.runError ? "Run again" : "Run"} aria-label={t.result || t.runError ? "Run again" : "Run"} onClick={(e) => (e.stopPropagation(), run(t))}>
+                                {t.result || t.runError ? <IconRefresh size={14} /> : <IconPlay size={14} />}
+                              </button>
+                              <button className="icon-btn" title="Open in editor" onClick={(e) => (e.stopPropagation(), ws.openQuery(`-- ${t.question.replace(/\n/g, " ")}\n${t.answer!.sql};\n`, "AI query"))}>
+                                <IconQuery size={14} />
+                              </button>
+                              <button className="icon-btn" title="Copy SQL" onClick={(e) => (e.stopPropagation(), navigator.clipboard.writeText(t.answer!.sql), ws.toast("SQL copied"))}>
+                                <IconCopy size={14} />
+                              </button>
                             </>
                           )}
-                          <button className="btn small" onClick={(e) => (e.stopPropagation(), setContext(t))}>What was sent</button>
+                          <button className="icon-btn" title="What was sent" onClick={(e) => (e.stopPropagation(), setContextId(t.id))}>
+                            <IconInfo size={14} />
+                          </button>
                         </div>
                       </>
                     }
                   />
+                )}
+                {t.summary && (
+                  <div className="ask-summary">
+                    <div className="ask-summary-label">Conclusion</div>
+                    {t.summary.status === "asking" && <Thinking label={`Reading the rows with ${sourceLabel}`} />}
+                    {t.summary.status === "error" && <div className="ask-error">{t.summary.error}</div>}
+                    {t.summary.status === "done" && <div className="ask-expl">{t.summary.text}</div>}
+                  </div>
                 )}
                 {t.id === selected && t.status === "running" && <div className="faint ask-note">Running…</div>}
                 {t.id === selected && result?.columns.length ? (
@@ -341,6 +403,9 @@ export function AskTab({ active, onOpenSettings }: { active: boolean; onOpenSett
                 <a className="ask-plan" onClick={() => api.openHelpUrl(MANAGE_USAGE_URL)}>Manage usage</a>
               )}
               <span className="spacer" />
+              <label className="ask-toggle" title="Send up to 50 rows of each read-only result to the AI so it can write a conclusion. Off by default, so rows stay on this computer.">
+                <input type="checkbox" checked={settings.aiReadRows} onChange={(e) => updateSettings({ aiReadRows: e.target.checked })} /> Read rows
+              </label>
               <label className="ask-toggle" title="Read-only SQL runs right away; anything that changes data always asks first">
                 <input type="checkbox" checked={settings.aiAutoRun} onChange={(e) => updateSettings({ aiAutoRun: e.target.checked })} /> Auto-run
               </label>
@@ -376,11 +441,17 @@ export function AskTab({ active, onOpenSettings }: { active: boolean; onOpenSett
         />
       )}
       {context?.answer && (
-        <Modal title="What was sent to the AI" width={720} onClose={() => setContext(null)} footer={<><span className="spacer" /><button className="btn primary" onClick={() => setContext(null)}>Close</button></>}>
+        <Modal title="What was sent to the AI" width={720} onClose={() => setContextId(null)} footer={<><span className="spacer" /><button className="btn primary" onClick={() => setContextId(null)}>Close</button></>}>
           <div className="faint" style={{ marginBottom: 6 }}>
-            Model: <b>{context.answer.model}</b> · This is the exact request: system prompt (with the schema), earlier questions and SQL in this tab (errors redacted), and your question. No table rows are sent.
+            Model: <b>{context.answer.model}</b> · This is the exact request: system prompt (with the schema), earlier questions and SQL in this tab (errors redacted), and your question. {context.summary ? "Rows are sent only in the summary request below." : "No table rows are sent."}
           </div>
           <pre className="mono code-box">{context.answer.schemaContext}</pre>
+          {context.summary && (
+            <>
+              <div className="faint" style={{ margin: "12px 0 6px" }}>Rows sent for the summary:</div>
+              <pre className="mono code-box">{context.summary.sent}</pre>
+            </>
+          )}
         </Modal>
       )}
     </div>
@@ -495,10 +566,10 @@ function useReveal(text: string, animate: boolean, onDone: () => void): number {
   return shown;
 }
 
-/** The AI's reply: explanation, then SQL, revealed as one stream with a caret; actions appear once it's done. */
+/** The AI's reply: reply, then SQL, revealed as one stream with a caret; actions appear once it's done. */
 function Answer({ turn, animate, onRevealed, footer }: { turn: Turn; animate: boolean; onRevealed: () => void; footer: React.ReactNode }) {
   const a = turn.answer!;
-  const expl = a.explanation ?? "";
+  const expl = a.reply ?? "";
   const sql = a.sql ? `${a.sql};` : "";
   const shown = useReveal(expl + sql, animate, onRevealed);
   const done = shown >= expl.length + sql.length;
@@ -585,7 +656,7 @@ function ConfirmWrite({ turn, sessionId, onCancel, onRun, onOpenEditor }: { turn
       }
     >
       <div className="confirm-write">
-        {turn.answer!.explanation && <div>{turn.answer!.explanation}</div>}
+        {turn.answer!.reply && <div>{turn.answer!.reply}</div>}
         <div className={`confirm-impact${risk.destructive || (rows ?? 0) > 1000 ? " danger" : ""}`} role="status">
           {impact}
         </div>

@@ -200,13 +200,13 @@ export interface ChatGptStatus {
 export interface AiTurn {
   question: string;
   sql: string;
-  explanation?: string;
+  reply?: string;
   error?: string | null;
 }
 
 export interface AiAnswer {
   sql: string;
-  explanation: string;
+  reply: string;
   modifiesData: boolean;
   model: string;
   schemaContext: string;
@@ -266,7 +266,7 @@ export const api = {
   chatgptModels: () => invoke<{ id: string; label: string }[]>("chatgpt_models"),
   chatgptWelcomed: () => invoke<void>("chatgpt_welcomed"),
   openHelpUrl: (url: string) => invoke<void>("open_help_url", { url }),
-  aiAsk: (sessionId: string, request: { provider: AiProvider; claudeAuth: ClaudeAuth; openaiAuth: OpenaiAuth; model: string; question: string; history: AiTurn[] }) =>
+  aiAsk: (sessionId: string, request: { provider: AiProvider; claudeAuth: ClaudeAuth; openaiAuth: OpenaiAuth; model: string; question: string; history: AiTurn[]; results?: string }) =>
     invoke<AiAnswer>("ai_ask", { sessionId, request }),
   renameGroup: (from: string, to: string) => invoke<void>("rename_group", { from, to }),
   /** Copies a connection URL to the clipboard on the backend (the password never reaches the UI). */
