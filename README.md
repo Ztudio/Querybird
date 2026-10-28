@@ -30,14 +30,19 @@ The current version is **0.2.0**. Its macOS installer is on the [release page](h
 | --- | --- | --- |
 | macOS 0.2.0 (Apple Silicon + Intel) | [Querybird_0.2.0_universal.dmg](https://github.com/Ztudio/Querybird/releases/download/v0.2.0/Querybird_0.2.0_universal.dmg) | `d8a0f08938b6c238c294533c5b023133fc337ea552a16a60b19d97bbd4e0fdc2` |
 | Windows 10/11 (x64) | [Querybird_0.1.0_x64-setup.exe](downloads/Querybird_0.1.0_x64-setup.exe) | `aeea394b81a0e5411928ddf536c128a6bd857781db1c6bef8259d1c38cab82da` |
-| Ubuntu / Debian (x64) | [Querybird_0.1.0_amd64.deb](downloads/Querybird_0.1.0_amd64.deb) | `3f4185cdcd5017ea2793b2a04261a3c6a76478fe3c096e528257fdcf7ed65ba6` |
+| Linux 0.2.0 (`.deb`, `.AppImage`, `.rpm`) | [Release page](https://github.com/Ztudio/Querybird/releases/tag/v0.2.0) | `690f9ba1836c29f1a8defbb852b24901b934b261e8d9f637086d701f7f57dbcc` (`.deb`) |
 
 > macOS: the app isn't notarized yet, so the first launch says Apple could not verify it. Click **Done**, then open
 > **System Settings → Privacy & Security**, scroll to **Security** and click **Open Anyway** (you only do this once).
 > Or run `xattr -dr com.apple.quarantine /Applications/Querybird.app`.
 >
-> Ubuntu (22.04 or newer): install with `sudo apt install ./Querybird_0.1.0_amd64.deb`, which also pulls in the
-> WebKitGTK and GTK libraries it needs. Then open Querybird from the app menu or run `querybird`.
+> Linux: grab the file for your distro from the [v0.2.0 release](https://github.com/Ztudio/Querybird/releases/tag/v0.2.0).
+> Ubuntu / Debian:
+> ```bash
+> wget https://github.com/Ztudio/Querybird/releases/download/v0.2.0/Querybird_0.2.0_amd64.deb
+> sudo apt install ./Querybird_0.2.0_amd64.deb
+> ```
+> Any distro, AppImage: `wget .../Querybird_0.2.0_amd64.AppImage && chmod +x Querybird_0.2.0_amd64.AppImage && ./Querybird_0.2.0_amd64.AppImage` (on Ubuntu 24.04+ you may need `sudo apt install libfuse2t64`).
 >
 > Windows: the installer isn't code-signed yet, so SmartScreen may warn on first run. Choose **More info → Run anyway**.
 
