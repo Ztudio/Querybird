@@ -1,11 +1,34 @@
-# Querybird
+<h1 align="center">Querybird</h1>
 
-A free, open-source database client for **PostgreSQL**, **MySQL** and **SQLite**, built with Rust and Tauri.
-Its interface follows the native, keyboard-first feel of TablePlus — but there is no license key,
-no trial and no account. Ever.
+<p align="center">
+  <img src="src-tauri/icons/128x128@2x.png" width="96" alt="Querybird logo">
+</p>
 
-Runs on macOS, Windows and Linux. Built-in **[Ask AI](#ask-ai)** turns plain-language questions into SQL
-with Claude or OpenAI.
+<p align="center">
+  A free, open-source database client for <b>PostgreSQL</b>, <b>MySQL</b> and <b>SQLite</b>.<br>
+  Native, keyboard-first and fast. No license key, no trial, no account.
+</p>
+
+<p align="center">
+  <a href="https://github.com/Ztudio/Querybird/actions/workflows/build.yml"><img src="https://github.com/Ztudio/Querybird/actions/workflows/build.yml/badge.svg" alt="Build status"></a>
+  <a href="https://github.com/Ztudio/Querybird/releases/latest"><img src="https://img.shields.io/github/v/release/Ztudio/Querybird" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license"></a>
+  <a href="https://buymeacoffee.com/ztudio"><img src="https://img.shields.io/badge/buy%20me%20a%20coffee-ztudio-yellow" alt="Buy me a coffee"></a>
+</p>
+
+<p align="center">
+  <a href="#download">Download</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#ask-ai">Ask AI</a> ·
+  <a href="#keyboard-shortcuts">Shortcuts</a> ·
+  <a href="#building">Build</a> ·
+  <a href="CONTRIBUTING.md">Contribute</a> ·
+  <a href="SECURITY.md">Security</a>
+</p>
+
+Querybird runs on macOS, Windows and Linux and is built with Rust and Tauri. Its layout follows the
+keyboard-first feel of TablePlus, and a built-in **[Ask AI](#ask-ai)** turns plain-language questions into SQL
+with Claude or OpenAI. It is not affiliated with TablePlus.
 
 <p align="center">
   <a href="https://buymeacoffee.com/ztudio"><img src="docs/buy-me-a-coffee.png" alt="Buy me a coffee" height="50"></a>
@@ -205,6 +228,15 @@ If Querybird saves you time, you can buy the maintainer a coffee. Querybird stay
   <a href="https://buymeacoffee.com/ztudio"><img src="docs/buy-me-a-coffee.png" alt="Buy me a coffee" height="60"></a>
 </p>
 
+## Contributing
+
+Bug reports, feature requests and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md),
+and open an [issue](https://github.com/Ztudio/Querybird/issues) before a large change so we can agree on the approach.
+
+## Security
+
+Please don't report vulnerabilities in public issues. See [SECURITY.md](SECURITY.md) for how to report them privately.
+
 ## License
 
-MIT. Querybird is an independent project and is not affiliated with TablePlus.
+Querybird is released under the [MIT License](LICENSE). It is an independent project and is not affiliated with TablePlus.
