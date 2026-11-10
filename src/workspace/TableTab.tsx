@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, errorText, type Cell, type Filter, type SortSpec, type TablePage, type TableStructure } from "../api";
+import { api, errorText, type Cell, type ColumnMeta, type Filter, type SortSpec, type TablePage, type TableStructure } from "../api";
 import { IconLeft, IconMinus, IconPlus, IconRight } from "../components/icons";
 import { Modal, mod, type MenuItem } from "../components/ui";
 import { DEFAULT_VALUE, buildChanges, displayRows, editCount, emptyEdits, setCell, toggleDelete, type PendingEdits } from "../lib/edits";
@@ -16,6 +16,10 @@ export const OPERATORS = [
 ];
 const NO_VALUE = new Set(["IS NULL", "IS NOT NULL"]);
 const RAW = "__raw__";
+// Stable fallbacks while no page is loaded: a fresh `[]` each render would re-run the effects
+// that depend on columns/rows and loop through onDetails.
+const NO_COLUMNS: ColumnMeta[] = [];
+const NO_ROWS: Cell[][] = [];
 
 interface FilterRow extends Filter {
   id: number;
@@ -148,8 +152,8 @@ export function TableTab({
     if (active && !info) api.tableInfo(ws.sessionId, schema, table).then(setInfo).catch(() => setInfo([]));
   }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const columns = page?.result.columns ?? [];
-  const baseRows = page?.result.rows ?? [];
+  const columns = page?.result.columns ?? NO_COLUMNS;
+  const baseRows = page?.result.rows ?? NO_ROWS;
   const rows = useMemo(() => displayRows(baseRows, columns, edits), [baseRows, columns, edits]);
   const visibleIdx = useMemo(() => columns.map((_, i) => i).filter((i) => !hidden.has(columns[i].name)), [columns, hidden]);
   const visibleCols = useMemo(() => visibleIdx.map((i) => columns[i]), [visibleIdx, columns]);
