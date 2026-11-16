@@ -1,4 +1,5 @@
 pub mod ai;
+mod update;
 mod chatgpt;
 pub mod db;
 mod local_cli;
@@ -633,6 +634,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             list_connections,
+            update::check_for_update,
             save_connection,
             delete_connection,
             has_saved_password,

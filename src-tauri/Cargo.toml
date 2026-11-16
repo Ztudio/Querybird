@@ -1,6 +1,6 @@
 [package]
 name = "querybird"
-version = "0.2.0"
+version = "0.3.0"
 description = "Querybird — a free, open-source database client"
 license = "MIT"
 edition = "2021"
@@ -34,3 +34,10 @@ rand = "0.10"
 jsonwebtoken = { version = "11", default-features = false, features = ["use_pem", "rust_crypto"] }
 open = "5"
 tauri-plugin-clipboard-manager = "2"
+
+# Smaller, leaner release binary. panic stays "unwind" so a failing background task can't take the whole app down.
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+debug = false

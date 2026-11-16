@@ -34,6 +34,8 @@ export interface Ctx {
   sessionId: string;
   connId: string;
   driver: Driver;
+  /** Connection tag: "production" turns on the strictest guards. */
+  tag: string;
   schema: string;
   objects: ObjectList;
   safeMode: boolean;

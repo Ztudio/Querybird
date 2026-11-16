@@ -7,53 +7,59 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 44px 20px 20px;
+  padding: 36px 12px 12px;
+  overflow-y: auto;
+  min-height: 0;
 }
-.welcome-logo { width: 84px; height: 84px; flex: none; pointer-events: none; }
-.welcome-name { font-size: 26px; font-weight: 650; margin-top: 14px; letter-spacing: -0.03em; }
-.welcome-version { color: var(--text-3); margin-top: 6px; font-size: 12px; font-variant-numeric: tabular-nums; }
-.welcome-free { color: var(--green); font-size: 11.5px; font-weight: 500; margin: 10px 0 24px; padding: 2px 10px; border-radius: 999px; background: color-mix(in srgb, var(--green) 12%, transparent); }
-.welcome-actions { width: 100%; display: grid; gap: 6px; }
-.welcome-actions + .welcome-actions { margin-top: 14px; }
+.welcome-logo { width: 56px; height: 56px; flex: none; pointer-events: none; }
+.welcome-name { font-size: 20px; font-weight: 600; margin-top: 14px; letter-spacing: -0.02em; }
+.welcome-version { color: var(--text-3); margin-top: 2px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.welcome-free { color: var(--text-3); font-size: 11.5px; margin: 0 0 14px; text-align: center; }
+/* Actions read as one nav list, split into two groups by a hairline. */
+.welcome-actions { width: 100%; display: grid; gap: 1px; }
+.welcome-actions + .welcome-actions { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border-soft); }
 .welcome-action {
   width: 100%;
-  height: 38px;
-  border-radius: var(--r-md);
-  border: 1px solid var(--border-soft);
-  background: color-mix(in srgb, var(--text) 4%, transparent);
-  transition-property: background-color, color, border-color;
+  height: var(--row);
+  border-radius: var(--r-sm);
+  border: 0;
+  background: transparent;
+  transition-property: background-color, color;
   transition-duration: 120ms;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 14px;
+  padding: 0 10px;
   color: var(--text-2);
-  font-size: 13.5px;
+  font-size: var(--fs-md);
+  font-weight: 450;
 }
-@media (hover: hover) { .welcome-action:hover { background: color-mix(in srgb, var(--text) 9%, transparent); color: var(--text); border-color: var(--control-border); } }
+.welcome-action svg { flex: none; color: var(--text-3); }
+@media (hover: hover) { .welcome-action:hover:not(:disabled) { background: var(--hover); color: var(--text); } }
 .welcome-right { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
-.welcome-head { display: flex; align-items: center; gap: 8px; padding: 18px 20px 10px 18px; }
-.welcome-list { flex: 1; overflow: auto; padding: 4px 14px 14px; outline: none; }
+.welcome-head { display: flex; align-items: center; gap: 6px; padding: 14px 14px 8px; }
+.welcome-list { flex: 1; overflow: auto; padding: 4px 10px 14px; outline: none; }
 .conn-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 12px;
+  padding: 9px 10px 9px 12px;
+  margin-bottom: 1px;
   border-radius: var(--r-md);
   position: relative;
   transition: background-color 120ms ease-out;
 }
-@media (hover: hover) { .conn-item:not(.selected):hover { background: color-mix(in srgb, var(--text) 5%, transparent); } }
+@media (hover: hover) { .conn-item:not(.selected):hover { background: var(--hover); } }
 .conn-item.selected { background: var(--sel); color: var(--text); }
 .conn-color { position: absolute; left: 3px; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; }
-.conn-name { font-size: 13.5px; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.conn-sub { font-size: 11.5px; font-family: var(--font-mono); color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.conn-name { font-size: var(--fs-md); font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conn-sub { font-size: 11.5px; font-family: var(--font-mono); color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
 .driver-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; padding: 14px 0 6px; min-height: 230px; align-content: start; }
 .driver-cell {
   background: transparent;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--r-md);
-  padding: 12px 4px 10px;
+  border: 1px solid var(--field-border);
+  border-radius: var(--r-lg);
+  padding: 16px 4px 12px;
   transition-property: border-color, background-color, box-shadow;
   transition-duration: 120ms;
   display: flex;
@@ -63,19 +69,33 @@
   font-size: 12.5px;
 }
 @media (hover: hover) { .driver-cell:hover { background: color-mix(in srgb, var(--text) 5%, transparent); } }
-.driver-cell.selected { border-color: var(--focus-ring); background: var(--sel); }
+.driver-cell.selected { border-color: var(--focus-ring); background: var(--hover); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
 .welcome-action:disabled { opacity: 0.4; }
-.conn-group { display: flex; align-items: center; gap: 5px; padding: 12px 8px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-3); }
+.conn-group { display: flex; align-items: center; gap: 6px; padding: 12px 10px 4px; font-size: 12px; font-weight: 500; color: var(--text-3); }
 .conn-item.grouped { margin-left: 12px; }
-.conn-ssh { font-size: 9.5px; font-weight: 700; border: 1px solid currentColor; border-radius: 3px; padding: 0 3px; margin-left: 6px; opacity: 0.7; vertical-align: 1px; }
+.conn-ssh { font-size: 10px; font-weight: 600; letter-spacing: 0.03em; border-radius: 999px; padding: 1px 6px; margin-left: 6px; color: var(--text-2); background: var(--active); vertical-align: 1px; }
 
 .conn-item > div:nth-last-child(2) { flex: 1; }
 .conn-actions { display: flex; gap: 2px; margin-left: auto; opacity: 0; transition: opacity 120ms; }
 .conn-item:hover .conn-actions, .conn-item.selected .conn-actions, .conn-item:focus-within .conn-actions { opacity: 1; }
-.conn-actions button { width: 26px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: var(--r-sm); background: transparent; color: inherit; opacity: 0.75; }
+.conn-actions button { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: var(--r-sm); background: transparent; color: inherit; opacity: 0.75; }
 .conn-actions button:hover { opacity: 1; background: color-mix(in srgb, currentColor 16%, transparent); }
 .conn-actions button.danger:hover { color: var(--red); }
 .conn-item.selected .conn-actions button.danger:hover { color: #fff; background: var(--red); }
 .new-user-server { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .new-user-warn { color: var(--orange); line-height: 1.45; }
 .new-user-warn code { display: block; margin-top: 6px; padding: 5px 8px; color: var(--text); user-select: text; }
+
+/* New-version notice on the connection screen. */
+.update-banner {
+  display: flex; align-items: center; gap: 10px; margin: 12px 16px 0; padding: 8px 8px 8px 14px;
+  border-radius: var(--r-md); font-size: 12.5px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.update-banner span { flex: 1; min-width: 0; }
+
+/* Left column order: identity, actions, then the licence note pinned to the bottom. */
+.welcome-version { margin-bottom: 22px; }
+.welcome-left > .spacer { order: 8; }
+.welcome-free { order: 9; margin: 12px 0 2px; }

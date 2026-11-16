@@ -266,6 +266,8 @@ export const api = {
   chatgptModels: () => invoke<{ id: string; label: string }[]>("chatgpt_models"),
   chatgptWelcomed: () => invoke<void>("chatgpt_welcomed"),
   openHelpUrl: (url: string) => invoke<void>("open_help_url", { url }),
+  /** Checks GitHub for a newer release. Runs in the backend; sends nothing about the user. */
+  checkForUpdate: () => invoke<{ latest: string; url: string; newer: boolean }>("check_for_update"),
   aiAsk: (sessionId: string, request: { provider: AiProvider; claudeAuth: ClaudeAuth; openaiAuth: OpenaiAuth; model: string; question: string; history: AiTurn[]; results?: string }) =>
     invoke<AiAnswer>("ai_ask", { sessionId, request }),
   renameGroup: (from: string, to: string) => invoke<void>("rename_group", { from, to }),

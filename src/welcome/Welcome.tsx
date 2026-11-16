@@ -2,13 +2,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { api, errorText, type ConnectionConfig, type Driver } from "../api";
-import { IconBox, IconChevron, IconDatabase, IconGear, IconPencil, IconPlug, IconPlus, IconSearch, IconTrash, IconUsers } from "../components/icons";
+import { IconBox, IconChevron, IconDatabase, IconGear, IconPencil, IconPlug, IconPlus, IconSearch, IconTrash, IconUsers, IconX } from "../components/icons";
 import { ContextMenu, DRIVERS, DriverBadge, Modal, isMac, load, save, tagColor, useToast, type MenuItem, type MenuState } from "../components/ui";
 import { BackupDialog } from "../components/BackupDialog";
 import { SettingsModal } from "../components/SettingsModal";
+import { getSettings } from "../lib/settings";
 import { NewUserDialog } from "./NewUserDialog";
 import { ConnectionForm, SQLITE_EXTENSIONS, fileStem, newConfig, parseUrl } from "./ConnectionForm";
 import "./welcome.css";
+
+interface UpdateInfo {
+  latest: string;
+  url: string;
+  newer: boolean;
+}
 
 type Dialog =
   | { kind: "driver"; group?: string }
@@ -23,6 +30,23 @@ type Dialog =
   | { kind: "newUser"; config?: ConnectionConfig };
 
 export function Welcome() {
+  // A newer release, found by a daily check (or remembered from an earlier launch) until dismissed.
+  const [update, setUpdate] = useState<UpdateInfo | null>(() => {
+    const u = load<UpdateInfo | null>("querybird.update", null);
+    return u?.newer && u.latest !== load("querybird.updateDismissed", "") ? u : null;
+  });
+  useEffect(() => {
+    const day = 24 * 60 * 60 * 1000;
+    if (!getSettings().checkUpdates || Date.now() - load("querybird.updateChecked", 0) < day) return;
+    save("querybird.updateChecked", Date.now());
+    api
+      .checkForUpdate()
+      .then((u) => {
+        save("querybird.update", u);
+        setUpdate(u.newer && u.latest !== load("querybird.updateDismissed", "") ? u : null);
+      })
+      .catch(() => {});
+  }, []);
   const [list, setList] = useState<ConnectionConfig[]>([]);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
@@ -182,6 +206,23 @@ export function Welcome() {
         </div>
       </div>
       <div className="welcome-right">
+        {update && (
+          <div className="update-banner" role="status">
+            <span>Querybird {update.latest} is available.</span>
+            <button className="btn small primary" onClick={() => api.openHelpUrl(update.url)}>Download</button>
+            <button
+              className="icon-btn"
+              title="Dismiss"
+              aria-label="Dismiss"
+              onClick={() => {
+                save("querybird.updateDismissed", update.latest);
+                setUpdate(null);
+              }}
+            >
+              <IconX size={12} />
+            </button>
+          </div>
+        )}
         <div className="welcome-head" data-tauri-drag-region>
           <button className="icon-btn" title="New connection" onClick={() => setDialog({ kind: "driver" })}>
             <IconPlus />
