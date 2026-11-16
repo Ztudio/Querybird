@@ -6,8 +6,8 @@ import { IconArrow, IconSortDown, IconSortUp } from "../components/icons";
 import { toTsv } from "../lib/export";
 import "./grid.css";
 
-const ROW_H = 25;
-const HEAD_H = 28;
+const ROW_H = 28;
+const HEAD_H = 32;
 const NUMERIC = /^(int|integer|bigint|smallint|tinyint|mediumint|serial|bigserial|numeric|decimal|newdecimal|float|double|real|money|long|longlong|short|tiny|int24|oid)/i;
 
 export interface GridSelection {
@@ -49,12 +49,12 @@ interface Props {
 
 function measure(columns: ColumnMeta[], rows: Cell[][]): number[] {
   return columns.map((col, i) => {
-    let max = col.name.length * 7.6 + 26;
+    let max = col.name.length * 7.2 + 36;
     const n = Math.min(rows.length, 120);
     for (let r = 0; r < n; r++) {
       const v = rows[r][i];
       const len = v === null ? 4 : Math.min(v.length, 60);
-      max = Math.max(max, len * 7.5 + 22);
+      max = Math.max(max, len * 7.5 + 30);
     }
     return Math.round(Math.min(Math.max(max, 46), 380));
   });
@@ -285,8 +285,8 @@ export const DataGrid = forwardRef<DataGridHandle, Props>(function DataGrid(prop
   };
 
   const autoFit = (c: number) => {
-    let max = columns[c].name.length * 7.6 + 26;
-    for (const r of rows) max = Math.max(max, Math.min((r[c]?.length ?? 4), 200) * 7.5 + 22);
+    let max = columns[c].name.length * 7.2 + 36;
+    for (const r of rows) max = Math.max(max, Math.min((r[c]?.length ?? 4), 200) * 7.5 + 30);
     setWidths((w) => w.map((x, i) => (i === c ? Math.round(Math.min(max, 900)) : x)));
   };
 

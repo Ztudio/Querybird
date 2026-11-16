@@ -35,27 +35,39 @@ const LIGHT_SYNTAX = { keyword: "#3050c8", string: "#a8520f", number: "#7a46c9",
 export const THEMES: Theme[] = [
   {
     id: "dark",
+    name: "Graphite",
+    type: "dark",
+    ui: {
+      background: "#18181a", foreground: "#ededee", mutedForeground: "#a0a0a6",
+      sidebar: "#111113", card: "#1e1e21", tertiary: "#111113", secondary: "#26262a", secondaryHover: "#2e2e33",
+      border: "#27272b", selection: "#27272b", primary: "#ededee", primaryForeground: "#111113", highlight: "#5b9dff",
+      destructive: "#e5534b", warning: "#e0b25c", success: "#3fcf8e",
+    },
+    syntax: { keyword: "#7aa9ff", string: "#8fd19e", number: "#e0a676", comment: "#6f7078", special: "#c39bf0" },
+  },
+  {
+    id: "light",
+    name: "Paper",
+    type: "light",
+    ui: {
+      background: "#ffffff", foreground: "#18181a", mutedForeground: "#5d5d66",
+      sidebar: "#f6f6f7", card: "#ffffff", tertiary: "#f6f6f7", secondary: "#ffffff", secondaryHover: "#f1f1f3",
+      border: "#e6e6e9", selection: "#ebebee", primary: "#18181a", primaryForeground: "#ffffff", highlight: "#2563eb",
+      destructive: "#d92d20", warning: "#8a6500", success: "#0f9d58",
+    },
+    syntax: { ...LIGHT_SYNTAX, keyword: "#2f54d6" },
+  },
+  {
+    id: "ember",
     name: "Ember",
     type: "dark",
     ui: {
       background: "#151110", foreground: "#eae8e6", mutedForeground: "#a8a5a3",
-      sidebar: "#1a1716", card: "#201e1c", tertiary: "#1a1716", secondary: "#2a2827", secondaryHover: "#252220",
+      sidebar: "#1a1716", card: "#201e1c", tertiary: "#1a1716", secondary: "#2a2827", secondaryHover: "#302d2b",
       border: "#2a2827", selection: "#252220", primary: "#eae8e6", primaryForeground: "#151110", highlight: "#e07850",
       destructive: "#cc4444", warning: "#e5c07b", success: "#00c950",
     },
     syntax: { ...DARK_SYNTAX, keyword: "#e07850" },
-  },
-  {
-    id: "light",
-    name: "Light",
-    type: "light",
-    ui: {
-      background: "#f9f9fa", foreground: "#171717", mutedForeground: "#4a4847",
-      sidebar: "#ececec", card: "#f4f4f4", tertiary: "#f1efee", secondary: "#f4f4f4", secondaryHover: "#e6e4e3",
-      border: "#e2e2e2", selection: "#e4e4e4", primary: "#171717", primaryForeground: "#fafafa", highlight: "#d6561b",
-      destructive: "#d92d20", warning: "#906d00", success: "#00a843",
-    },
-    syntax: { ...LIGHT_SYNTAX, keyword: "#c2410c" },
   },
   {
     id: "monokai",
@@ -107,7 +119,7 @@ export const THEMES: Theme[] = [
   },
 ];
 
-/** "system" follows the OS: Ember in dark mode, Light otherwise. */
+/** "system" follows the OS: Graphite in dark mode, Paper otherwise. */
 export const SYSTEM_THEME = "system";
 
 export function findTheme(id: string, prefersDark: boolean): Theme {
@@ -143,9 +155,9 @@ export function themeVars(t: Theme): Record<string, string> {
     "--num": t.syntax.number,
     "--comment": t.syntax.comment,
     "--shadow": dark
-      ? "0 0 0 1px rgb(255 255 255 / 0.06), 0 2px 6px rgb(0 0 0 / 0.35), 0 16px 48px rgb(0 0 0 / 0.55)"
+      ? "0 0 0 1px rgb(255 255 255 / 0.07), 0 4px 12px rgb(0 0 0 / 0.3), 0 24px 64px rgb(0 0 0 / 0.5)"
       : "0 0 0 1px rgb(20 20 30 / 0.07), 0 2px 6px rgb(20 20 30 / 0.07), 0 16px 40px rgb(20 20 30 / 0.15)",
     "--shadow-sm": dark ? "0 0 0 1px rgb(255 255 255 / 0.05), 0 1px 2px rgb(0 0 0 / 0.4)" : "0 0 0 1px rgb(20 20 30 / 0.07), 0 1px 2px rgb(20 20 30 / 0.06)",
-    "--backdrop": dark ? "rgb(5 4 4 / 0.6)" : "rgb(20 20 30 / 0.3)",
+    "--backdrop": dark ? "rgb(0 0 0 / 0.55)" : "rgb(20 20 30 / 0.3)",
   };
 }

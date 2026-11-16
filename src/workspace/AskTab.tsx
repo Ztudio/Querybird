@@ -403,10 +403,10 @@ export function AskTab({ active, onOpenSettings }: { active: boolean; onOpenSett
                 <a className="ask-plan" onClick={() => api.openHelpUrl(MANAGE_USAGE_URL)}>Manage usage</a>
               )}
               <span className="spacer" />
-              <label className="ask-toggle" title="Send up to 50 rows of each read-only result to the AI so it can write a conclusion. Off by default, so rows stay on this computer.">
+              <label className="ask-toggle" title="Send up to 50 result rows to the AI for a conclusion. Off by default.">
                 <input type="checkbox" checked={settings.aiReadRows} onChange={(e) => updateSettings({ aiReadRows: e.target.checked })} /> Read rows
               </label>
-              <label className="ask-toggle" title="Read-only SQL runs right away; anything that changes data always asks first">
+              <label className="ask-toggle" title="Run read-only SQL at once. Changes always ask first.">
                 <input type="checkbox" checked={settings.aiAutoRun} onChange={(e) => updateSettings({ aiAutoRun: e.target.checked })} /> Auto-run
               </label>
               <button

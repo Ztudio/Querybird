@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitStatements, statementAt, withLimit, isReadOnly, writeRisk } from "./sql";
+import { splitStatements, statementAt, withLimit, isReadOnly, writeRisk, dangerOf } from "./sql";
 import { buildChanges, displayRows, editCount, emptyEdits, setCell, toggleDelete } from "./edits";
 import { toCsv, toInsertSql, toJson } from "./export";
 
@@ -43,6 +43,23 @@ describe("sql", () => {
     ]) expect(isReadOnly(bad), bad).toBe(false);
     expect(isReadOnly("SELECT replace(name, 'a', 'b') FROM t WHERE note = 'drop table'")).toBe(true);
     expect(isReadOnly('SELECT "update" FROM t')).toBe(true);
+  });
+});
+
+describe("dangerOf", () => {
+  it("names the database or schema a whole-database drop hits", () => {
+    expect(dangerOf("DROP DATABASE shop;")).toEqual({ label: "Drops a whole database or schema", target: "shop" });
+    expect(dangerOf("drop schema archive")?.target).toBe("archive");
+  });
+  it("flags unfiltered deletes, updates and truncates", () => {
+    expect(dangerOf("DELETE FROM orders")?.label).toMatch(/every row/);
+    expect(dangerOf("UPDATE orders SET status = 'x'")?.label).toMatch(/every row/);
+    expect(dangerOf("TRUNCATE TABLE audit")?.target).toBe("audit");
+  });
+  it("leaves filtered writes and reads alone", () => {
+    expect(dangerOf("DELETE FROM orders WHERE id = 3")).toBeNull();
+    expect(dangerOf("UPDATE orders SET status = 'x' WHERE id = 3")).toBeNull();
+    expect(dangerOf("SELECT * FROM orders")).toBeNull();
   });
 });
 

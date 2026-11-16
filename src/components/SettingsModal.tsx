@@ -10,7 +10,7 @@ type SettingsTab = "general" | "editor" | "data" | "tools" | "ai";
 export function SettingsModal({ onClose, initialTab = "general" }: { onClose: () => void; initialTab?: SettingsTab }) {
   const s = useSettings();
   const [tab, setTab] = useState<SettingsTab>(initialTab);
-  const check = (label: string, key: "uppercaseKeywords" | "closeBrackets" | "alternatingRows" | "restoreTabs" | "confirmDelete") => (
+  const check = (label: string, key: "uppercaseKeywords" | "closeBrackets" | "alternatingRows" | "restoreTabs" | "confirmDelete" | "checkUpdates") => (
     <label className="row" style={{ gap: 7 }}>
       <input type="checkbox" checked={s[key]} onChange={(e) => updateSettings({ [key]: e.target.checked })} /> {label}
     </label>
@@ -70,6 +70,8 @@ export function SettingsModal({ onClose, initialTab = "general" }: { onClose: ()
             <div>{check("Reopen tabs when connecting again", "restoreTabs")}</div>
             <label>Safety</label>
             <div>{check("Confirm before dropping or truncating", "confirmDelete")}</div>
+            <label>Updates</label>
+            <div>{check("Check for a newer version when Querybird starts", "checkUpdates")}</div>
           </>
         )}
         {tab === "editor" && (

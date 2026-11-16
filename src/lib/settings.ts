@@ -30,6 +30,8 @@ export interface Settings {
   aiAutoRun: boolean;
   /** Send up to 50 rows of each read-only result to the AI for a written conclusion. Off by default. */
   aiReadRows: boolean;
+  /** Look for a newer release on launch (one request a day to GitHub). */
+  checkUpdates: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -54,6 +56,7 @@ export const DEFAULT_SETTINGS: Settings = {
   codexModel: "",
   aiAutoRun: true,
   aiReadRows: false,
+  checkUpdates: true,
 };
 
 const KEY = "querybird.settings";

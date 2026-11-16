@@ -223,3 +223,25 @@ export function writeRisk(sql: string): WriteRisk {
   }
   return base;
 }
+
+/** A statement that can destroy data, and the object it hits, for the warning shown before it runs. */
+export interface Danger {
+  label: string;
+  target: string | null;
+}
+
+export function dangerOf(sql: string): Danger | null {
+  const text = sql.trim().replace(/;\s*$/, "");
+  if (/^\s*drop\s+(database|schema)\b/i.test(stripLiterals(text))) {
+    return { label: "Drops a whole database or schema", target: writeRisk(text).target };
+  }
+  const r = writeRisk(text);
+  if (r.kind === "drop") return { label: "Drops an object (table, view or index)", target: r.target };
+  if (r.kind === "truncate") return { label: "Empties a table (TRUNCATE)", target: r.target };
+  if ((r.kind === "delete" || r.kind === "update") && r.noWhere) {
+    return { label: r.kind === "delete" ? "Deletes every row (no WHERE)" : "Changes every row (no WHERE)", target: r.target };
+  }
+  if (r.kind === "alter" && r.destructive) return { label: "Alters a table in a way that can lose data", target: null };
+  if (r.destructive) return { label: "Destructive statement", target: null };
+  return null;
+}

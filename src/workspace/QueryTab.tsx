@@ -3,7 +3,7 @@ import { format } from "sql-formatter";
 import { api, errorText, type QueryResult } from "../api";
 import { IconChevronDown } from "../components/icons";
 import { Modal, mod } from "../components/ui";
-import { isReadOnly, splitStatements, statementAt, withLimit } from "../lib/sql";
+import { dangerOf, isReadOnly, splitStatements, statementAt, withLimit, type Danger } from "../lib/sql";
 import { toCsv, toInsertSql, toJson, toTsv } from "../lib/export";
 import { DataGrid, type GridSelection } from "./DataGrid";
 import { SqlEditor, type SqlEditorHandle } from "./SqlEditor";
@@ -40,7 +40,7 @@ export function QueryTab({
   const [resultIdx, setResultIdx] = useState(0);
   const [pane, setPane] = useState<"data" | "message">("data");
   const [running, setRunning] = useState(false);
-  const [confirm, setConfirm] = useState<{ statements: string[] } | null>(null);
+  const [confirm, setConfirm] = useState<{ statements: string[]; dangers: Danger[] } | null>(null);
   const [selection, setSelection] = useState<GridSelection>({ rows: [], focus: null });
   const [editorH, setEditorH] = useState(0.45);
   const [runMenu, setRunMenu] = useState(false);
@@ -50,8 +50,11 @@ export function QueryTab({
 
   const execute = async (statements: string[], force = false) => {
     if (!statements.length) return;
-    if (ws.safeMode && !force && statements.some((s) => !isReadOnly(s))) {
-      setConfirm({ statements });
+    // Destructive statements always get a warning on production; elsewhere the "confirm before dropping" setting decides.
+    const dangers = statements.flatMap((st) => dangerOf(st) ?? []);
+    const warn = dangers.length > 0 && (ws.tag === "production" || getSettings().confirmDelete);
+    if (!force && (warn || (ws.safeMode && statements.some((st) => !isReadOnly(st))))) {
+      setConfirm({ statements, dangers: warn ? dangers : [] });
       return;
     }
     setConfirm(null);
@@ -263,22 +266,55 @@ export function QueryTab({
       </div>
 
       {confirm && (
-        <Modal
-          title="Safe mode is on — run these statements?"
-          width={600}
-          onClose={() => setConfirm(null)}
-          footer={
-            <>
-              <span className="spacer" />
-              <button className="btn" autoFocus onClick={() => setConfirm(null)}>Cancel</button>
-              <button className="btn danger" onClick={() => execute(confirm.statements, true)}>Run</button>
-            </>
-          }
-        >
-          <pre className="mono code-box">{confirm.statements.join(";\n\n")};</pre>
-        </Modal>
+        <ConfirmRun
+          statements={confirm.statements}
+          dangers={confirm.dangers}
+          production={ws.tag === "production"}
+          onCancel={() => setConfirm(null)}
+          onRun={() => execute(confirm.statements, true)}
+        />
       )}
     </div>
+  );
+}
+
+/**
+ * The last check before SQL that can delete data runs. On a production connection the engineer types
+ * the object's name first, so a wrong tab or a stray Enter can't destroy it.
+ */
+function ConfirmRun({ statements, dangers, production, onCancel, onRun }: { statements: string[]; dangers: Danger[]; production: boolean; onCancel: () => void; onRun: () => void }) {
+  const [typed, setTyped] = useState("");
+  const target = dangers.find((d) => d.target)?.target ?? null;
+  const phrase = production && dangers.length ? target ?? "run" : null;
+  const ok = !phrase || typed.trim() === phrase;
+  return (
+    <Modal
+      title={dangers.length ? "This can delete data" : "Safe mode is on — run these statements?"}
+      width={620}
+      onClose={onCancel}
+      footer={
+        <>
+          <span className="spacer" />
+          <button className="btn" autoFocus={!phrase} onClick={onCancel}>Cancel</button>
+          <button className="btn danger" disabled={!ok} onClick={onRun}>Run</button>
+        </>
+      }
+    >
+      {dangers.map((d, i) => (
+        <div key={i} className="confirm-impact danger" style={{ marginBottom: 8 }}>
+          {d.label}
+          {d.target ? <> · <b className="mono">{d.target}</b></> : null}
+        </div>
+      ))}
+      {production && dangers.length > 0 && <div className="faint" style={{ marginBottom: 8 }}>This connection is tagged production.</div>}
+      <pre className="mono code-box">{statements.join(";\n\n")};</pre>
+      {phrase && (
+        <label style={{ display: "grid", gap: 6, marginTop: 12 }}>
+          <span className="muted">Type <b className="mono">{phrase}</b> to run it.</span>
+          <input className="input mono" autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ok && onRun()} />
+        </label>
+      )}
+    </Modal>
   );
 }
 

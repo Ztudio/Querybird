@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import { api, errorText, type Filter, type ObjectList, type SessionInfo } from "../api";
@@ -7,19 +7,26 @@ import {
   IconList, IconChat, IconTrash, IconX,
 } from "../components/icons";
 import { ContextMenu, DRIVERS, Modal, isMac, load, mod, save, tagColor, useToast, type MenuState } from "../components/ui";
-import { BackupDialog } from "../components/BackupDialog";
-import { SettingsModal } from "../components/SettingsModal";
 import { getSettings, updateSettings } from "../lib/settings";
-import { OverviewTab, ProcessTab, UsersTab } from "./AdminTabs";
-import { AskTab } from "./AskTab";
-import { ExportDialog, ImportCsvDialog, ImportSqlDialog, SearchDialog } from "./Tools";
 import { DetailsPanel } from "./DetailsPanel";
 import { OpenAnything } from "./OpenAnything";
-import { QueryTab } from "./QueryTab";
 import { Sidebar, type HistoryItem, type SavedQuery } from "./Sidebar";
 import { TableTab } from "./TableTab";
 import { WorkspaceContext, type Ctx, type Details, type TabApi } from "./context";
 import "./workspace.css";
+
+// Heavy screens and dialogs load on first use, so opening a workspace only parses what it shows.
+const AskTab = lazy(() => import("./AskTab").then((m) => ({ default: m.AskTab })));
+const QueryTab = lazy(() => import("./QueryTab").then((m) => ({ default: m.QueryTab })));
+const OverviewTab = lazy(() => import("./AdminTabs").then((m) => ({ default: m.OverviewTab })));
+const ProcessTab = lazy(() => import("./AdminTabs").then((m) => ({ default: m.ProcessTab })));
+const UsersTab = lazy(() => import("./AdminTabs").then((m) => ({ default: m.UsersTab })));
+const SettingsModal = lazy(() => import("../components/SettingsModal").then((m) => ({ default: m.SettingsModal })));
+const BackupDialog = lazy(() => import("../components/BackupDialog").then((m) => ({ default: m.BackupDialog })));
+const SearchDialog = lazy(() => import("./Tools").then((m) => ({ default: m.SearchDialog })));
+const ExportDialog = lazy(() => import("./Tools").then((m) => ({ default: m.ExportDialog })));
+const ImportCsvDialog = lazy(() => import("./Tools").then((m) => ({ default: m.ImportCsvDialog })));
+const ImportSqlDialog = lazy(() => import("./Tools").then((m) => ({ default: m.ImportSqlDialog })));
 
 type Tab =
   | { id: string; kind: "table"; schema: string; table: string; isView: boolean; preview: boolean; filters?: Filter[]; view?: "data" | "structure" }
@@ -483,6 +490,7 @@ export function Workspace({ sessionId }: { sessionId: string }) {
             sessionId,
             connId,
             driver: info.connection.driver,
+            tag: info.connection.tag,
             schema,
             objects,
             safeMode,
@@ -674,11 +682,11 @@ export function Workspace({ sessionId }: { sessionId: string }) {
               {tabs.map((t) => (
                 <div key={t.id} className="tab-pane" style={{ display: t.id === activeId ? "flex" : "none" }}>
                   {t.kind === "overview" ? (
-                    <OverviewTab register={(a) => (tabApis.current[t.id] = a)} />
+                    <Suspense fallback={null}><OverviewTab register={(a) => (tabApis.current[t.id] = a)} /></Suspense>
                   ) : t.kind === "processes" ? (
-                    <ProcessTab register={(a) => (tabApis.current[t.id] = a)} />
+                    <Suspense fallback={null}><ProcessTab register={(a) => (tabApis.current[t.id] = a)} /></Suspense>
                   ) : t.kind === "users" ? (
-                    <UsersTab register={(a) => (tabApis.current[t.id] = a)} />
+                    <Suspense fallback={null}><UsersTab register={(a) => (tabApis.current[t.id] = a)} /></Suspense>
                   ) : t.kind === "table" ? (
                     <TableTab
                       schema={t.schema}
@@ -697,7 +705,8 @@ export function Workspace({ sessionId }: { sessionId: string }) {
                       onImportCsv={(table) => setDialog({ kind: "importCsv", table })}
                     />
                   ) : (
-                    <QueryTab
+                    <Suspense fallback={null}>
+                      <QueryTab
                       initialSql={t.sql}
                       autoRun={t.run}
                       active={t.id === activeId}
@@ -706,6 +715,7 @@ export function Workspace({ sessionId }: { sessionId: string }) {
                       register={(a) => (tabApis.current[t.id] = a)}
                       onSaveQuery={saveQuery}
                     />
+                    </Suspense>
                   )}
                 </div>
               ))}
@@ -762,7 +772,7 @@ export function Workspace({ sessionId }: { sessionId: string }) {
             </div>
             {aiMounted && (
               <div className="side-body" style={{ display: rightTab === "ai" ? "flex" : "none" }}>
-                <AskTab active={panels.right && rightTab === "ai"} onOpenSettings={() => setDialog({ kind: "settings", tab: "ai" })} />
+                <Suspense fallback={null}><AskTab active={panels.right && rightTab === "ai"} onOpenSettings={() => setDialog({ kind: "settings", tab: "ai" })} /></Suspense>
               </div>
             )}
             {rightTab === "details" && (
@@ -776,12 +786,13 @@ export function Workspace({ sessionId }: { sessionId: string }) {
         <ContextMenu menu={menu} onClose={() => setMenu(null)} />
         {toast.node}
         {anything && <OpenAnything saved={saved} onClose={() => setAnything(false)} />}
-        {dialog?.kind === "settings" && <SettingsModal initialTab={dialog.tab} onClose={() => setDialog(null)} />}
-        {dialog?.kind === "search" && <SearchDialog onClose={() => setDialog(null)} />}
-        {dialog?.kind === "export" && <ExportDialog preselect={dialog.tables} onClose={() => setDialog(null)} />}
-        {dialog?.kind === "importCsv" && <ImportCsvDialog table={dialog.table} onClose={() => setDialog(null)} />}
-        {dialog?.kind === "importSql" && <ImportSqlDialog onClose={() => setDialog(null)} />}
+        {dialog?.kind === "settings" && <Suspense fallback={null}><SettingsModal initialTab={dialog.tab} onClose={() => setDialog(null)} /></Suspense>}
+        {dialog?.kind === "search" && <Suspense fallback={null}><SearchDialog onClose={() => setDialog(null)} /></Suspense>}
+        {dialog?.kind === "export" && <Suspense fallback={null}><ExportDialog preselect={dialog.tables} onClose={() => setDialog(null)} /></Suspense>}
+        {dialog?.kind === "importCsv" && <Suspense fallback={null}><ImportCsvDialog table={dialog.table} onClose={() => setDialog(null)} /></Suspense>}
+        {dialog?.kind === "importSql" && <Suspense fallback={null}><ImportSqlDialog onClose={() => setDialog(null)} /></Suspense>}
         {(dialog?.kind === "backup" || dialog?.kind === "restore") && (
+          <Suspense fallback={null}>
           <BackupDialog
             mode={dialog.kind}
             connections={[{ ...c, database: c.database || schema }]}
@@ -791,7 +802,7 @@ export function Workspace({ sessionId }: { sessionId: string }) {
               toast.show(msg);
               if (dialog.kind === "restore") refreshObjects();
             }}
-          />
+          /></Suspense>
         )}
         {schemaPicker && (
           <SchemaPicker

@@ -11,32 +11,31 @@
 .g-head {
   position: sticky;
   top: 0;
-  height: 28px;
+  height: 32px;
   z-index: 3;
-  background: var(--toolbar);
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
 .g-hcell {
   position: absolute;
   top: 0;
-  height: 28px;
+  height: 32px;
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 4px;
-  padding: 0 8px;
+  padding: 0 10px;
   border-right: 1px solid var(--grid-line);
   font-family: var(--font-ui);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-2);
   white-space: nowrap;
 }
-@media (hover: hover) { .g-hcell:hover { background: var(--panel-2); color: var(--text); } }
+@media (hover: hover) { .g-hcell:hover { background: var(--bg-alt); color: var(--text); } }
 .g-htext { overflow: hidden; text-overflow: ellipsis; }
 .g-sort { font-size: 8px; color: var(--text-2); }
 .g-resize { position: absolute; right: -4px; top: 0; width: 8px; height: 100%; cursor: col-resize; z-index: 2; }
-.g-row { position: absolute; left: 0; height: 25px; background: var(--bg); }
+.g-row { position: absolute; left: 0; height: 28px; background: var(--bg); }
 .g-row.odd { background: var(--bg-alt); }
 .no-stripes .g-row.odd { background: var(--bg); }
 .g-row.sel { background: var(--row-selected); }
@@ -46,9 +45,9 @@
 .g-cell {
   position: absolute;
   top: 0;
-  height: 25px;
-  line-height: 25px;
-  padding: 0 6px;
+  height: 28px;
+  line-height: 28px;
+  padding: 0 10px;
   border-right: 1px solid var(--grid-line);
   white-space: nowrap;
   overflow: hidden;
@@ -65,7 +64,7 @@
 .g-null { color: var(--null); flex: 1; }
 .g-default { color: var(--blue); flex: 1; font-style: italic; }
 .g-cell.num .g-null { flex: none; }
-.g-num { color: var(--text-3); justify-content: flex-end; font-size: 11px; background: var(--panel); font-variant-numeric: tabular-nums; }
+.g-num { color: var(--text-3); justify-content: flex-end; font-size: 11px; font-variant-numeric: tabular-nums; }
 .g-fk {
   flex: none;
   border: 0;
@@ -83,13 +82,13 @@
 .g-cell.editing { padding: 0; overflow: visible; z-index: 2; }
 .g-input {
   width: 100%;
-  height: 25px;
+  height: 28px;
   border: 0;
   outline: 1px solid var(--focus-ring);
   outline-offset: -1px;
   background: var(--input);
   font-family: var(--font-mono);
-  font-size: 12px;
-  padding: 0 6px;
+  font-size: var(--grid-font-size, 12px);
+  padding: 0 10px;
 }
-.g-filler { position: absolute; left: 0; height: 750px; }
+.g-filler { position: absolute; left: 0; height: 840px; }
